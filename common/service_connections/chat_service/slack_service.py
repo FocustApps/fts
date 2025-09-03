@@ -64,7 +64,7 @@ class SlackService(ChatService):
         if report.failures > 0:
             build_uri = (
                 os.getenv("Build.BuildUri")
-                or os.getenv("BUILD_URI")
+                or os.getenv("BUILD_URL") or "WHERE IS YOUR BUILD? ¯\\_(ツ)_/¯"
             )
             parsed_message += (
                 f"\n----------------------------------------\n"
