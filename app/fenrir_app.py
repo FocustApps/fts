@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import TEMPLATE_PATH
 from app.routes import API_ROUTERS
-from common.utils import get_project_root
+from app.utils import get_project_root
 from common.app_logging import create_logging
 
 from app.config import get_base_app_config
