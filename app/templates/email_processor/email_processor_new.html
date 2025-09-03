@@ -1,0 +1,66 @@
+{% block content %}
+<div class="container">
+    <button class="btn btn-sm btn-primary" hx-get={{ url_for(view_url) }} hx-target="#pageContent" hx-swap="innerHTML">
+        Back
+    </button>
+    <div class="container">
+        <section style="width: 40vw;">
+            <form id="createEmailItemForm">
+                <h3>Add Email Item</h3>
+                <div class="form-group">
+                    <label for="username">Email Item:</label>
+                    <br>
+                    <input type="text" id="email_item_id" name="email_item_id" style="padding: 5px 0;" required>
+                </div>
+                <div>
+                    <label for="test_name">Test Name:</label>
+                    <br>
+                    <input type="text" id="test_name" name="test_name" style="padding: 5px 0;" required>
+                </div>
+                <br>
+                <div class="form-group">
+                    <label for="system">System:</label>
+                    <select name="system" class="form-control" id="system">
+                        <optgroup label="System">
+                            {% for system in system_choices %}
+                            <option value="{{ system }}">{{ system }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+                <br>
+                <div class="form-group">
+                    <label for="multi_attachment_flag">Multi-Attachment:</label>
+                    <br>
+                    <select name="multi_attachment_flag" id="multi_attachment_flag">
+                        <optgroup label="Multi-Attachment">
+                            <option value="false">False</option>
+                            <option value="true">True</option>
+                        </optgroup>
+                    </select>
+                    <br>
+                </div>
+                <br>
+                <div class="form-group">
+                    <label for="multi_email_flag">Multi-Email:</label>
+                    <br>
+                    <select name="multi_email_flag" id="multi_email_flag">
+                        <optgroup label="Multi-Email">
+                            <option value="false">False</option>
+                            <option value="true">True</option>
+                        </optgroup>
+                    </select>
+                    <br>
+                </div>
+                <br>
+                <button style="padding: 5px 0;" class="btn btn-primary" hx-target="#createEmailItemForm"
+                    hx-ext="json-enc" hx-post={{ url_for('create_email_item') }}
+                    hx-headers="{'Content-Type': 'application/json'}" hx-trigger="click" type="submit">
+                    Create
+                </button>
+            </form>
+        </section>
+        <br>
+    </div>
+
+    {% endblock %}

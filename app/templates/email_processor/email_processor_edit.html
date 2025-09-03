@@ -1,0 +1,65 @@
+<div class="container">
+    <section>
+        <form hx-ext="json-enc" hx-headers="{'Content-Type': 'application/json'}" hx-patch={{
+            url_for('update_email_item', record_id=record.id)}} hx-target="this" hx-swap="outerHTML">
+            <div class="form-group">
+                <label for="url">Email Item ID:</label><br>
+                <input type="text" id="email_item_id" name="email_item_id" value="{{ record.email_item_id }}">
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="test_name">Test Name</label><br>
+                <input type="text" id="test_name" name="test_name" value="{{ record.test_name }}">
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="system">System:</label>
+                <select name="system" class="form-control" id="system">
+                    <optgroup label="System">
+                        {% for system in system_choices %}
+                        <option value="{{ system }}">{{ system }}</option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="multi_attachment_flag">Multi-Attachment:</label>
+                <br>
+                <select name="multi_attachment_flag" id="multi_attachment_flag">
+                    <optgroup label="Multi-Attachment">
+                        <option value="true" {{ 'selected' if record.multi_attachment_flag else '' }}>True</option>
+                        <option value="false" {{ 'selected' if not record.multi_attachment_flag else '' }}>False
+                        </option>
+                    </optgroup>
+                </select>
+                <br>
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="multi_email_flag">Multi-Email:</label>
+                <br>
+                <select name="multi_email_flag" id="multi_email_flag">
+                    <optgroup label="Multi-Email">
+                        <option value="true" {{ 'selected' if record.multi_email_flag else '' }}>True</option>
+                        <option value="false" {{ 'selected' if not record.multi_email_flag else '' }}>False</option>
+                    </optgroup>
+                </select>
+                <br>
+            </div>
+            <br>
+            <button type="submit" class="btn btn-primary">
+                Submit
+            </button>
+            <button class="btn" hx-get={{ url_for('view_email_item', record_id=record.id)}}>
+                Cancel
+            </button>
+            <style>
+                .form-control {
+                    width: auto;
+                    min-width: max-content;
+                }
+            </style>
+        </form>
+    </section>
+</div>

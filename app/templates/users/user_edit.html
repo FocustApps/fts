@@ -1,0 +1,55 @@
+<div class="container">
+    <section>
+        <form hx-ext="json-enc" hx-headers="{'Content-Type': 'application/json'}" hx-patch={{ url_for('update_user',
+            record_id=user.id)}} hx-target="this" hx-swap="outerHTML">
+            <div class="form-group">
+                <label for="url">username:</label><br>
+                <input type="text" id="username" name="username" value="{{ user.username }}">
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="email">Email:</label><br>
+                <input type="text" id="email" name="email" value="{{ user.email }}">
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="password">Password:</label><br>
+                <input type="text" id="password" name="password" value="{{ user.password }}">
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="secretProvider">Secret Provider:</label>
+                <select name="secret_provider" class="form-control" id="secret_provider">
+                    <optgroup label="Secret Provider">
+                        {% for provider in secret_providers %}
+                        <option value="{{ provider }}">{{ provider }}</option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="secret_url">Secret Url:</label><br>
+                <input type="text" id="secret_url" name="secret_url" value="{{ user.secret_url }}">
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="secret name">Secret Name:</label><br>
+                <input type="text" id="secret_name" name="secret_name" value="{{ user.secret_name }}">
+            </div>
+            <br>
+            <button type="submit" class="btn btn-primary">
+                Submit
+            </button>
+            <button class="btn" hx-get={{ url_for('view_user', record_id=user.id)}}>
+                Cancel
+            </button>
+            <style>
+                .form-control {
+                    width: auto;
+                    min-width: max-content;
+                }
+            </style>
+        </form>
+    </section>
+</div>

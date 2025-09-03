@@ -1,0 +1,42 @@
+services:
+  postgres:
+    build: 
+      context: .
+      dockerfile: common/service_connections/db_service/Dockerfile
+    environment:
+      POSTGRES_DB: fenrir
+      POSTGRES_USER: fenrir
+      POSTGRES_PASSWORD: fenrirpass
+      POSTGRES_NAME: fenrir_local
+      DATABASE_TYPE: postgres
+      PYTHONPATH: /fenrir
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fenrir -d fenrir"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  fenrir:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POSTGRES_DB: fenrir
+      POSTGRES_USER: fenrir
+      POSTGRES_PASSWORD: fenrirpass
+      POSTGRES_NAME: fenrir_local
+      DATABASE_TYPE: postgres
+      PYTHONPATH: /fenrir
+    command: ["sh", "entrypoint.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  db_data:

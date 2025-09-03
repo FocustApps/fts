@@ -1,0 +1,47 @@
+{% block content %}
+<div class="container">
+    <button class="btn btn-sm btn-primary" hx-get={{ url_for(view_url) }} hx-target="#pageContent" hx-swap="innerHTML">
+        Back
+    </button>
+    <section style="width: 40vw;">
+        <form id="createPageForm">
+            <h3>Add Page</h3>
+            <div class="form-group">
+                <label for="username">Page Name:</label>
+                <br>
+                <input type="text" id="page_name" name="page_name" style="padding: 5px 0;" required>
+            </div>
+            <div class="form-group">
+                <label for="page_url"> Page URL </label>
+                <br>
+                <input type="text" id="page_url" name="page_url" style="padding: 5px 0;" required>
+            </div>
+            <br>
+            <div class="form-group">
+                <label for="identifiers">Identifiers:</label>
+                <br>
+                <textarea id="identifiers" name="identifiers" style="padding: 5px 0;" required></textarea>
+                <br>
+            </div>
+            <button style="padding: 5px 0;" class="btn btn-primary" hx-target="#createPageForm" hx-ext="json-enc"
+                hx-post={{ url_for('create_page') }} hx-headers="{'Content-Type': 'application/json'}"
+                hx-trigger="click" type="submit">
+                Create
+            </button>
+        </form>
+    </section>
+</div>
+
+<script>
+    function isJsonString(str) {
+        try {
+            var parsedJson = JSON.parse(str);
+            if (parsedJson && typeof parsedJson === "object") {
+                return parsedJson;
+            }
+        } catch (e) { }
+        return false;
+    }
+</script>
+
+{% endblock %}

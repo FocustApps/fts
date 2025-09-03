@@ -1,0 +1,62 @@
+{
+    "cSpell.words": [
+        "anticon",
+        "autopopulating",
+        "checkmark",
+        "conftest",
+        "Dataclass",
+        "Dataclasses",
+        "dotenv",
+        "fastapi",
+        "focustapps",
+        "formcontrolname",
+        "Interactable",
+        "keyvault",
+        "loginfmt",
+        "msal",
+        "multipage",
+        "Overbill",
+        "pydantic",
+        "pylint",
+        "pytest",
+        "quickbooks",
+        "safecheck",
+        "sqlalchemy",
+        "templating",
+        "thead",
+        "timesheet",
+        "timetracker",
+        "unauthenticate",
+        "usefixtures",
+        "webelement"
+    ],
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    "pylint.args": [
+        "--disable=E1101",
+        "--disable=C0115",
+        "--disable=C0116",
+        "--disable=C0114",
+        "--disable=W0603",
+        "--disable=W0611",
+        "C0301=90",
+        "--function-naming-style=snake_case",
+        "--method-naming-style=snake_case",
+        "--class-naming-style=PascalCase",
+    ],
+    "black-formatter.args": [
+        "--line-length=90",
+    ],
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "editor.codeActionsOnSave": {
+        "source.unusedImports": "always",
+        "source.organizeImports": "always"
+    },
+    "pylint.enabled": true,
+    "files.associations": {
+        "*.sql": "postgres"
+    }
+}

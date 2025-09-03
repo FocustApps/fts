@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <link rel="icon" href="/public/img/fenfen.png" type="image/icon type">
+    <link rel="stylesheet" href="public/css/bootstrap.min.css">
+    <script src="public/js/jquery.min.js"></script>
+    <script src="public/js/bootstrap.bundle.min.js"></script>
+    <script src="public/js/htmx.min.js"></script>
+    <script src="public/js/json-enc.js"></script>
+    <title> FTS </title>
+</head>
+
+<body id="body">
+    {% block nav %}
+    <nav class="navbar navbar-expand-lg bg-body-tertiary rounded">
+        <div class="container-fluid">
+            <img src="/public/img/fenfen.png" alt="fenrir" style="max-height: 50px; max-width: 50px;">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbar">
+                <ul class="navbar-nav">
+                    {% for key, value in navigation.items() %}
+                    <li class="nav-item">
+                        <button id={{ value|e }} class="nav-link btn btn-success" hx-get={{ url_for(value|e) }}
+                            hx-trigger="click" hx-target="#pageContent" hx-swap="innerHTML" type="button">
+                            {{ key|e }}
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endblock %}
+    <div id="pageContent">
+        {% block content %}
+        {% block title %}
+        <header id="title">
+            <div class="container">
+                <h1>Fenrir Testing System </h1>
+            </div>
+        </header>
+        {% endblock %}
+        <div class="container">
+            <p>Click on the nav buttons to view info.</p>
+        </div>
+        {% endblock %}
+    </div>
+</body>
+
+{% block footer %}
+<footer class="footer mt-auto py-3 bg-dark">
+    <div class="container">
+        <p class="text-center">&copy; 2025 Fenrir Testing System <br> <img src="/public/img/focustapps.png"
+                style="max-height: 50px; max-width: 150px;"> </p>
+
+    </div>
+</footer>
+{% endblock %}
+
+</html>

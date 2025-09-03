@@ -1,0 +1,161 @@
+from typing import List, Optional
+from datetime import datetime
+import logging
+
+from pydantic import BaseModel
+import sqlalchemy as sql
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    declarative_base,
+    Session,
+)
+
+
+Base = declarative_base()
+
+
+class UserTable(Base):
+    __tablename__ = "user"
+
+    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(sql.String(96), unique=True)
+    email: Mapped[str] = mapped_column(sql.String(96))
+    _password: Mapped[Optional[str]] = mapped_column(sql.String(96), name="password")
+    secret_provider: Mapped[Optional[str]] = mapped_column(sql.String(96))
+    secret_url: Mapped[Optional[str]] = mapped_column(sql.String(1024))
+    secret_name: Mapped[Optional[str]] = mapped_column(sql.String(1024))
+    environment_id: Mapped[int] = mapped_column(sql.Integer)
+    created_at: Mapped[datetime] = mapped_column(sql.DateTime)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime, default=None)
+
+    def _obfuscate(self, value):
+        return f"{value[0]}{'*' * (len(value) - 2)}{value[-1]}"
+
+    @hybrid_property
+    def password(self):
+        return self._obfuscate(self._password)
+
+    @password.setter
+    def password(self, value):
+        self._password = value
+
+    @password.expression
+    def password(cls):
+        return cls._password
+
+
+class UserModel(BaseModel):
+    """
+    Schema for representing a user.
+
+    Fields:
+    - id: int | None, the ID of the user.
+    - username: str | None, the username of the user.
+    - email: str | None, the email of the user.
+    - password: str | None, the password of the user.
+    - cloud_provider: CloudProviderEnum | None, the cloud provider of the user.
+    - secret_url: str | None, the secret URL of the user.
+    - environment_id: int | None, the ID of the environment associated with the user.
+    - created_at: str | None, the creation date of the user.
+    - updated_at: str | None, the update date of the user.
+    """
+
+    id: int | None = None
+    username: str | None = None
+    email: str | None = None
+    password: str | None = None
+    secret_provider: str | None = None
+    secret_url: str | None = None
+    secret_name: str | None = None
+    environment_id: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+############# User Queries #############
+
+
+def insert_user(user: UserModel, session: Session, engine) -> UserModel:
+    """
+    Creates a user in the database
+    """
+    if user.id:
+        user.id = None
+        logging.warning("Environment ID will only be set by the system")
+    with session(engine) as session:
+        user.created_at = datetime.now()
+        db_user = UserTable(**user.model_dump())
+        session.add(db_user)
+        session.commit()
+        session.refresh(db_user)
+    return UserModel(**db_user.__dict__)
+
+
+def query_user_by_username(username: str, session: Session, engine) -> UserModel:
+    """
+    Retrieves a user from the database by username
+    """
+    with session(engine) as session:
+        user = session.query(UserTable).filter(UserTable.username == username).first()
+    if not user:
+        raise ValueError(f"Username {username} not found.")
+    unpacked_user = UserModel(**user.__dict__)
+    unpacked_user.password = user._password
+    return unpacked_user
+
+
+def query_user_by_id(user_id: int, session: Session, engine) -> UserModel:
+    """
+    Retrieves a user from the database by id
+    """
+    with session(engine) as session:
+        user = session.query(UserTable).filter(UserTable.id == user_id).first()
+    if not user:
+        raise ValueError(f"User ID with {user_id} not found.")
+    unpacked_user = UserModel(**user.__dict__)
+    unpacked_user.password = user._password
+    return unpacked_user
+
+
+def query_all_users(session: Session, engine) -> List[UserTable]:
+    """
+    Retrieves all users from the database
+    """
+    with session(engine) as session:
+        users = session.query(UserTable).all()
+        return [UserModel(**user.__dict__) for user in users]
+
+
+def update_user_by_id(
+    user_id: int, user: UserModel, session: Session, engine
+) -> UserModel:
+    """
+    Updates a user in the database
+    """
+    with session(engine) as session:
+        db_user = session.get(UserTable, user_id)
+        if not db_user:
+            raise ValueError(f"Environment ID {user_id} not found.")
+        user.updated_at = datetime.now()
+        user_data = user.model_dump(exclude_unset=True)
+        for key, value in user_data.items():
+            logging.debug(f"Setting {key} to {value}")
+            setattr(db_user, key, value)
+        session.commit()
+        session.refresh(db_user)
+    return UserModel(**db_user.__dict__)
+
+
+def drop_user_by_id(user_id: int, session: Session, engine) -> int:
+    """
+    Deletes a user in the database
+    """
+    # TODO: Implement a cascade deletion for the user field in the environment table.
+    with session(engine) as session:
+        user = session.get(UserTable, user_id)
+        session.delete(user)
+        session.commit()
+        logging.info(f"User ID {user_id} deleted.")
+    return 1

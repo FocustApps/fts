@@ -1,0 +1,33 @@
+*__pycache__*
+.DS_Store
+*pytest_cache*
+*.pyc
+
+cache/*
+/config/runconfig.json
+auth_token.txt
+
+AUTO*.pdf
+AUTO*.docx
+AUTO*.doc
+
+# Pytest generated report
+report.xml
+
+
+test_targets.txt
+test_results.txt
+
+# Docker Compose files
+*docker-compose-v3-composite.yml
+
+# Python virtual environment
+.venv/
+
+# environment variables
+.env
+
+# Sandboxes
+zzz_sandbox.sh
+sandbox.py
+zzz_helper.py
