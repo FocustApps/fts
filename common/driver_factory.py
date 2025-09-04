@@ -18,14 +18,10 @@ class InvalidWebdriverException(Exception):
     pass
 
 
-def driver_factory(
-    browser: str, driver_location: DriverLocationEnum, headless=False
-) -> SeleniumController:
+def add_browser_options(browser: str) -> ChromeOptions | FirefoxOptions | EdgeOptions:
     """
-    browser: str - chrome
-    driver_location: str - local-no-container
+    Adds browser-specific options.
     """
-    driver = None
     match browser:
         case BrowserEnum.CHROME.value:
             options = ChromeOptions()
@@ -35,46 +31,74 @@ def driver_factory(
             options = EdgeOptions()
         case _:
             raise InvalidWebdriverException("Invalid Browser")
+    return options
 
-    match driver_location, browser:
-        case DriverLocationEnum.LOCAL, BrowserEnum.CHROME.value:
-            if headless:
-                options.add_argument("--headless")
-            driver = SeleniumController(
-                driver=ChromeWebDriver(options=options), log=logging.getLogger(__name__)
-            )
-        case DriverLocationEnum.LOCAL, BrowserEnum.FIREFOX.value:
-            driver = SeleniumController(
-                driver=FirefoxDriver(options=options), log=logging.getLogger(__name__)
-            )
-        case DriverLocationEnum.LOCAL, BrowserEnum.EDGE.value:
-            driver = SeleniumController(
-                driver=EdgeDriver(options=options), log=logging.getLogger(__name__)
-            )
 
-        case DriverLocationEnum.LOCAL_CONTAINER:
-            driver = SeleniumController(
-                driver=RemoteWebDriver(
-                    command_executor="http://localhost:4444", options=options
-                ),
-                log=logging.getLogger(__name__),
-            )
-        case DriverLocationEnum.CLOUD, browser:
-            options.browser_version = "latest"
-            options.platform_name = "Windows 11"
-            sauce_options = {}
-            sauce_options["build"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-            sauce_options["name"] = os.getenv("TEST_TARGETS") or "Fenrir"
-            options.set_capability("sauce:options", sauce_options)
-            driver = SeleniumController(
-                driver=RemoteWebDriver(
-                    command_executor=os.getenv("REMOTE_DRIVER_URL"), options=options
-                ),
-                log=logging.getLogger(__name__),
-            )
+def driver_factory(
+    browser: str, driver_location: DriverLocationEnum, headless=False
+) -> SeleniumController:
+    """
+    browser: str - chrome
+    driver_location: str - local-no-container
+    """
+    driver = None
+    options = add_browser_options(browser)
 
+    # NOTE:
+    # Structural pattern matching with Enum members failed when duplicate Enum
+    # classes were loaded under different module names (e.g., 'common.fenrir_enums'
+    # and 'fts.common.fenrir_enums'), producing different identity objects. To
+    # avoid brittle identity matching, we compare on the underlying .value
+    # strings instead. This keeps behavior stable regardless of import path.
+
+    loc_val = getattr(driver_location, "value", driver_location)
+    browser_val = browser
+
+    if (
+        loc_val == DriverLocationEnum.LOCAL.value
+        and browser_val == BrowserEnum.CHROME.value
+    ):
+        if headless:
+            options.add_argument("--headless")
+        driver = SeleniumController(
+            driver=ChromeWebDriver(options=options), log=logging.getLogger(__name__)
+        )
+    if (
+        loc_val == DriverLocationEnum.LOCAL.value
+        and browser_val == BrowserEnum.FIREFOX.value
+    ):
+        driver = SeleniumController(
+            driver=FirefoxDriver(options=options), log=logging.getLogger(__name__)
+        )
+    if (
+        loc_val == DriverLocationEnum.LOCAL.value
+        and browser_val == BrowserEnum.EDGE.value
+    ):
+        driver = SeleniumController(
+            driver=EdgeDriver(options=options), log=logging.getLogger(__name__)
+        )
+    if loc_val == DriverLocationEnum.LOCAL_CONTAINER.value:
+        driver = SeleniumController(
+            driver=RemoteWebDriver(
+                command_executor="http://localhost:4444", options=options
+            ),
+            log=logging.getLogger(__name__),
+        )
+    if loc_val == DriverLocationEnum.CLOUD.value:
+        options.browser_version = "latest"
+        options.platform_name = "Windows 11"
+        sauce_options = {}
+        sauce_options["build"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        sauce_options["name"] = os.getenv("TEST_TARGETS") or "Fenrir"
+        options.set_capability("sauce:options", sauce_options)
+        driver = SeleniumController(
+            driver=RemoteWebDriver(
+                command_executor=os.getenv("REMOTE_DRIVER_URL"), options=options
+            ),
+            log=logging.getLogger(__name__),
+        )
     if not driver:
-        raise InvalidWebdriverException("Invalid Webdriver")
-    if not driver:
-        raise InvalidWebdriverException("Invalid Webdriver")
+        raise InvalidWebdriverException(
+            f"Invalid Webdriver: {browser}, {driver_location}"
+        )
     return driver
