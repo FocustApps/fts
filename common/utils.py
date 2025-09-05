@@ -1,7 +1,7 @@
 import json
 import base64
 import logging
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 from pathlib import Path
 from urllib import response
 from datetime import datetime
@@ -10,7 +10,7 @@ from datetime import datetime
 PARENT_DIR_NAMES = ["Fenrir", "fenrir", "s", "FTS", "fts"]
 
 
-def get_project_root(target_override: str | None = None) -> Path:
+def get_project_root(target_override: Optional[str]) -> Path:
     """
     Returns the Path to the Fenrir project root directory.
     """
