@@ -1,8 +1,10 @@
-from datetime import datetime
 import os
 from typing import Dict
-from pydantic import BaseModel
+from datetime import datetime
+
 import requests
+from pydantic import BaseModel
+
 from fts.common.service_connections.chat_service import ChatService
 
 
