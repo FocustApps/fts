@@ -10,7 +10,7 @@ from datetime import datetime
 PARENT_DIR_NAMES = ["Fenrir", "fenrir", "s", "FTS", "fts"]
 
 
-def get_project_root(target_override: Optional[str]) -> Path:
+def get_project_root(target_override: Optional[str] = None) -> Path:
     """
     Returns the Path to the Fenrir project root directory.
     """
