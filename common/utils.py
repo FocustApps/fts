@@ -10,14 +10,14 @@ from datetime import datetime
 PARENT_DIR_NAMES = ["Fenrir", "fenrir", "s", "FTS", "fts"]
 
 
-def get_project_root(target_override: str | None = None) -> Path:
+def get_project_root(target_directory: str | None = None) -> Path:
     """
     Returns the Path to the Fenrir project root directory.
     """
     current_path = Path(__file__).resolve()
-    if target_override:
+    if target_directory:
         for parent in current_path.parents:
-            if parent.name == target_override:
+            if parent.name == target_directory:
                 return parent
 
     for parent in current_path.parents:
