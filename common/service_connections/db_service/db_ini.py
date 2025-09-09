@@ -1,8 +1,8 @@
 import logging
 from sqlalchemy import MetaData
 
-from service_connections.db_service import DB_TABLES
-from service_connections.db_service.db_manager import DB_ENGINE
+from common.service_connections.db_service import DB_TABLES
+from common.service_connections.db_service.db_manager import DB_ENGINE
 
 
 def create_db_and_tables():

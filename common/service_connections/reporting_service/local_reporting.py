@@ -2,7 +2,7 @@ import os
 import shutil
 from datetime import datetime
 
-from service_connections.reporting_service import ReportingService
+from common.service_connections.reporting_service import ReportingService
 
 
 class LocalReportingService(ReportingService):

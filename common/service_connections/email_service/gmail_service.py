@@ -36,7 +36,7 @@ from common.service_connections.db_service.email_processor_model import (
     EmailProcessorModel,
     update_email_item_by_id,
 )
-from service_connections.test_case_service.azure_devops_test_cases import (
+from common.service_connections.test_case_service.azure_devops_test_cases import (
     get_attachment_data,
     get_attachment_id,
     get_multiple_attachment_ids,

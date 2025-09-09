@@ -1,8 +1,9 @@
-from datetime import datetime
-import logging
 import os
-from service_connections.cloud_service import CloudService
-from service_connections.reporting_service import ReportingService
+import logging
+from datetime import datetime
+
+from common.service_connections.cloud_service import CloudService
+from common.service_connections.reporting_service import ReportingService
 
 
 class CloudReportingService(ReportingService):

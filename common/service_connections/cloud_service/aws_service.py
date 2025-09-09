@@ -2,7 +2,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 import logging
-from service_connections.cloud_service import CloudService
+from fts.common.service_connections.cloud_service import CloudService
 
 
 class AwsCloudService(CloudService):

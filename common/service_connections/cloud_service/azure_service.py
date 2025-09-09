@@ -2,7 +2,8 @@ from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from azure.cosmos import CosmosClient
 from azure.storage.blob import BlobServiceClient
-from service_connections.cloud_service import CloudService
+
+from fts.common.service_connections.cloud_service import CloudService
 
 
 class AzureCloudService(CloudService):

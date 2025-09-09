@@ -2,12 +2,11 @@
 import os
 from typing import Dict, List
 import yaml
-import random
-import string
 
 
 TIMEOUT = f"session-timeout={os.getenv('SESSION_TIMEOUT', 45)}"
 HUB_CONNECTION_STRING = f"hub={os.getenv('HUB', 'http://localhost')}"
+
 
 def remove_specified(services: List[str], data: Dict) -> Dict:
     """

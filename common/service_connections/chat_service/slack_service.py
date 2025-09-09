@@ -3,7 +3,7 @@ import os
 from typing import Dict
 from pydantic import BaseModel
 import requests
-from service_connections.chat_service import ChatService
+from fts.common.service_connections.chat_service import ChatService
 
 
 class ReportModel(BaseModel):
