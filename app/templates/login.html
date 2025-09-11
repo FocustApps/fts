@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fenrir Authentication</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .fenrir-logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .alert-banner {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            max-width: 400px;
+        }
+    </style>
+</head>
+
+<body class="login-container d-flex align-items-center justify-content-center">
+    <!-- Alert Banner for Messages -->
+    <div id="alert-container" class="alert-banner"></div>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card login-card p-4">
+                    <div class="card-body">
+                        <!-- Logo/Title -->
+                        <div class="text-center mb-4">
+                            <h1 class="fenrir-logo mb-2">FENRIR</h1>
+                            <p class="text-muted">Testing System Authentication</p>
+                        </div>
+
+                        <!-- Login Form -->
+                        <form id="login-form" hx-post="/auth/login" hx-target="#alert-container" hx-swap="innerHTML">
+                            <div class="mb-4">
+                                <label for="token" class="form-label">Authentication Token</label>
+                                <input type="password" class="form-control form-control-lg" id="token" name="token"
+                                    placeholder="Enter your 64-character token" required minlength="64" maxlength="64"
+                                    autocomplete="current-password">
+                                <div class="form-text">
+                                    Token should be 64 characters long. Check your email for the latest token.
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg" id="login-btn">
+                                    <span class="spinner-border spinner-border-sm d-none" id="login-spinner"></span>
+                                    <span id="login-text">Authenticate</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Token Info -->
+                        <div class="mt-4 p-3 bg-light rounded">
+                            <h6 class="mb-2">Token Information</h6>
+                            <small class="text-muted">
+                                • Tokens rotate every {{ config.auth_rotation_interval_minutes }} minutes<br>
+                                • New tokens are sent to: {{ config.email_recipient or 'Not configured' }}<br>
+                                • Session expires after 24 hours of inactivity
+                            </small>
+                        </div>
+
+                        <!-- Links -->
+                        <div class="text-center mt-4">
+                            <small class="text-muted">
+                                Need help? Contact your system administrator
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script>
+        // Show loading state during form submission
+        document.addEventListener('htmx:beforeRequest', function (event) {
+            if (event.target.id === 'login-form') {
+                const spinner = document.getElementById('login-spinner');
+                const text = document.getElementById('login-text');
+                const btn = document.getElementById('login-btn');
+
+                spinner.classList.remove('d-none');
+                text.textContent = 'Authenticating...';
+                btn.disabled = true;
+            }
+        });
+
+        // Reset loading state after request
+        document.addEventListener('htmx:afterRequest', function (event) {
+            if (event.target.id === 'login-form') {
+                const spinner = document.getElementById('login-spinner');
+                const text = document.getElementById('login-text');
+                const btn = document.getElementById('login-btn');
+
+                spinner.classList.add('d-none');
+                text.textContent = 'Authenticate';
+                btn.disabled = false;
+            }
+        });
+
+        // Handle successful login
+        document.addEventListener('htmx:responseError', function (event) {
+            if (event.target.id === 'login-form') {
+                // Form validation feedback
+                const tokenInput = document.getElementById('token');
+                tokenInput.classList.add('is-invalid');
+
+                setTimeout(() => {
+                    tokenInput.classList.remove('is-invalid');
+                }, 3000);
+            }
+        });
+
+        // Auto-dismiss alerts
+        document.addEventListener('htmx:afterSwap', function (event) {
+            if (event.target.id === 'alert-container') {
+                const alerts = event.target.querySelectorAll('.alert');
+                alerts.forEach(alert => {
+                    if (alert.classList.contains('alert-success')) {
+                        // Redirect after successful login
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1500);
+                    } else {
+                        // Auto-dismiss error alerts
+                        setTimeout(() => {
+                            alert.remove();
+                        }, 5000);
+                    }
+                });
+            }
+        });
+
+        // Token input formatting
+        document.getElementById('token').addEventListener('input', function (e) {
+            // Remove any non-alphanumeric characters for cleaner input
+            e.target.value = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+        });
+    </script>
+</body>
+
+</html>

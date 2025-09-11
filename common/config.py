@@ -13,11 +13,13 @@ class ConfigException(Exception):
 
 
 class MissingExpectedEnviron(ConfigException):
-    pass
+    def __init__(self, environ_name: str):
+        super().__init__(f"Missing expected environment variable: {environ_name}")
 
 
 class BadConfiguration(ConfigException):
-    pass
+    def __init__(self, message: str):
+        super().__init__(f"Bad configuration: {message}")
 
 
 class LoggingConfig(BaseModel):
@@ -26,7 +28,7 @@ class LoggingConfig(BaseModel):
 
 def get_logging_config() -> LoggingConfig:
     load_dotenv()
-    log_level = os.getenv("LOG_LEVEL")
+    log_level = os.getenv("LOG_LEVEL") or "INFO"
     if not log_level:
         raise MissingExpectedEnviron("LOG_LEVEL")
     return LoggingConfig(
@@ -42,7 +44,8 @@ class CloudServiceConfig(BaseModel):
 def get_cloud_service_config() -> CloudServiceConfig:
     load_dotenv()
     return CloudServiceConfig(
-        cloud_service=os.getenv("CLOUD_SERVICE"), access_token=os.getenv("ACCESS_TOKEN")
+        cloud_service=(os.getenv("CLOUD_SERVICE") or "LOCAL").upper(),
+        access_token=os.getenv("ACCESS_TOKEN"),
     )
 
 

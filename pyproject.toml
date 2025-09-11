@@ -38,7 +38,8 @@ dependencies = [
     "azure-mgmt-authorization>=4.0.0,<5",
     "python-multipart>=0.0.20,<0.0.21",
     "boto3>=1.36.16,<2",
-    "psycopg2-binary>=2.9.10"
+    "psycopg2-binary>=2.9.10",
+    "pytest-asyncio>=1.1.0",
 ]
 
 [dependency-groups]
@@ -62,14 +63,15 @@ target-version = ['py312']
 [tool.pytest.ini_options]
 pythonpath = ["."]
 log_cli = true
+addopts = "--strict-markers"
 markers = [
     "release: mark a test that will be ran for a release",
     "manual_only: mark a test that is will only be manually tested",
     "planned: mark a test that is not yet automated but is planned to be.",
     "covered_by_unit: mark a test that is covered by a unit test",
     "requires_data: tests that require data from email processing.",
+    "asyncio: mark a test as an async test",
 ]
-filterwarnings = ["ignore::UserWarning"]
 
 [tool.pylint]
 disable = ["E1101"]

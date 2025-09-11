@@ -3,13 +3,14 @@ The users module contains the API and views for users that have
 access to environments.
 """
 
-from fastapi import Request, APIRouter
+from fastapi import Request, APIRouter, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.config import get_base_app_config
 from common.service_connections.db_service.db_manager import DB_ENGINE
+from app.dependencies.auth_dependency import verify_auth_token
 
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass
@@ -134,7 +135,9 @@ user_api_router = APIRouter(prefix="/user/api", tags=["user"], include_in_schema
 
 
 @user_api_router.post("/user")
-def create_user(request: Request, user: UserModel) -> UserModel:
+def create_user(
+    request: Request, user: UserModel, token: str = Depends(verify_auth_token)
+) -> UserModel:
     new_user = insert_user(user=user, engine=DB_ENGINE, session=Session)
     update_environment_by_id(
         environment_id=user.environment_id,
@@ -146,20 +149,29 @@ def create_user(request: Request, user: UserModel) -> UserModel:
 
 
 @user_api_router.get("/all-users")
-def get_all_users(request: Request):
+def get_all_users(request: Request, token: str = Depends(verify_auth_token)):
     return query_all_users(engine=DB_ENGINE, session=Session)
 
 
 @user_api_router.get("/user/{record_id}")
-def get_user_by_id(request: Request, record_id: int):
+def get_user_by_id(
+    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+):
     return query_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
 
 
 @user_api_router.put("/user/{record_id}")
-def update_user(request: Request, record_id: int, user: UserModel):
+def update_user(
+    request: Request,
+    record_id: int,
+    user: UserModel,
+    token: str = Depends(verify_auth_token),
+):
     return update_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
 
 
 @user_api_router.delete("/user/{record_id}")
-def delete_user_by_id(request: Request, record_id: int):
+def delete_user_by_id(
+    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+):
     return drop_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
