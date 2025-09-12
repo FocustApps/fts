@@ -3,37 +3,24 @@ The page model is the table that stores page information, how to get to that pag
 which environments it is available in, and the element identifiers associated with
 that page.
 """
+
 import logging
 from typing import Dict, List
 from datetime import datetime
 
-import sqlalchemy as sql
 from sqlalchemy import Engine
 from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
-    declarative_base,
     Session,
 )
 
 from pydantic import BaseModel
 
 from common.fenrir_enums import EnvironmentEnum
+from common.service_connections.db_service.database import PageTable
 
 
-Base = declarative_base()
-
-
-class PageTable(Base):
-    __tablename__ = "page"
-
-    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
-    environments: Mapped[dict] = mapped_column(sql.JSON)
-    page_name: Mapped[str] = mapped_column(sql.String(96), unique=True)
-    page_url: Mapped[str] = mapped_column(sql.String(1024))
-    created_at: Mapped[datetime] = mapped_column(sql.DateTime)
-    updated_at: Mapped[datetime] = mapped_column(sql.DateTime)
-    identifiers: Mapped[Dict] = mapped_column(sql.JSON)
+# Use the centralized PageTable from database.py
+# Remove the local Base and PageTable definitions
 
 
 class PageModel(BaseModel):

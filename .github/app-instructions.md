@@ -2,6 +2,123 @@
 
 These rules focus on the `/app` web layer so AI tools and contributors follow the same patterns.
 
+## Authentication System
+
+The Fenrir Testing System uses a comprehensive token-based authentication system with the following components:
+
+### Token-Based Authentication
+
+- **64-character cryptographically secure tokens** (256-bit entropy)
+- **60-minute rotation interval** (configurable via `AUTH_ROTATION_INTERVAL_MINUTES`)
+- **Automatic email notifications** when new tokens are generated
+- **Session cookie management** for web interface authentication
+
+### Auth Service (`app/services/auth_service.py`)
+
+- **Global singleton pattern**: Use `get_auth_service()` instead of direct `AuthService()` instantiation
+- **Token persistence**: Tokens stored in `/tmp/fenrir_auth_token.txt` with creation/expiration timestamps
+- **External sync callback**: Integrates with email service for token notifications
+- **Thread-safe operations**: Atomic file operations with proper locking
+
+### Authentication Routes (`app/routes/auth.py`)
+
+- **Login page**: `/auth/login` - Professional HTMX-powered login form
+- **Login processing**: POST `/auth/login` - Validates tokens and creates session cookies
+- **Logout**: POST `/auth/logout` - Clears session cookies and redirects
+- **Token validation**: Validates both header tokens and session cookies
+
+### Authentication Middleware
+
+- **Global protection**: All endpoints require authentication by default
+- **Cookie validation**: Automatic session cookie checking
+- **Header validation**: Supports `X-Auth-Token` and `Authorization: Bearer` headers
+- **Redirect handling**: Unauthenticated requests redirect to login page
+
+### Email Integration (`app/services/email_service.py`)
+
+- **Gmail SMTP_SSL**: Uses port 465 for secure email delivery
+- **Automatic notifications**: Sends new tokens to configured recipient
+- **Configuration**: Uses `EMAIL_USER`/`EMAIL_PASSWORD` for authentication
+- **Error handling**: Graceful degradation if email service unavailable
+
+### Environment Configuration
+
+Required environment variables:
+
+```properties
+# Authentication
+AUTH_TOKEN_LENGTH=64
+AUTH_ROTATION_INTERVAL_MINUTES=60
+AUTH_TOKEN_FILE_PATH=/tmp/fenrir_auth_token.txt
+
+# Email Notifications
+EMAIL_NOTIFICATION_ENABLED=true
+EMAIL_RECIPIENT=admin@company.com
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=465
+EMAIL_USER=sender@gmail.com
+EMAIL_PASSWORD=app-password
+EMAIL_SUBJECT=Fenrir Authentication Token Update
+```
+
+### Usage Patterns
+
+#### Protecting Routes
+
+All routes are protected by default. For API endpoints that need token validation:
+
+```python
+# Token automatically validated by middleware
+@router.get("/api/protected-endpoint")
+async def protected_endpoint():
+    # This endpoint requires valid authentication
+    return {"status": "authenticated"}
+```
+
+#### Getting Auth Service
+
+Always use the global service pattern:
+
+```python
+from app.services.auth_service import get_auth_service
+
+try:
+    auth_service = get_auth_service()
+    current_token = auth_service.get_current_token()
+except RuntimeError:
+    # Handle case where auth service not initialized
+    return {"error": "Authentication service unavailable"}
+```
+
+#### Login Flow
+
+1. User visits protected endpoint → Redirected to `/auth/login`
+2. User enters 64-character token → POST `/auth/login`
+3. Token validated → Session cookie set → Redirect to dashboard
+4. Future requests use session cookie for authentication
+
+#### Token Rotation
+
+- **Automatic**: Tokens rotate every 60 minutes (if APScheduler available)
+- **Manual**: Can be triggered by restarting the application
+- **Email notification**: New tokens automatically emailed to configured recipient
+- **Graceful handling**: Old tokens remain valid briefly during rotation
+
+### Security Features
+
+- **Cryptographically secure**: Uses `secrets.token_bytes()` for token generation
+- **HTTPOnly cookies**: Session cookies not accessible via JavaScript
+- **Secure headers**: Proper SameSite and security attributes
+- **Token expiration**: Tokens automatically expire after configured interval
+- **Input validation**: 64-character length validation on login form
+
+### Testing Considerations
+
+- **Development tokens**: Use environment-specific token files
+- **Mock email service**: Disable email notifications in test environments
+- **Session testing**: Test both cookie and header authentication methods
+- **Token rotation**: Test token expiration and renewal flows
+
 ## Routers
 
 - Always create dual routers for each feature module:
