@@ -26,6 +26,14 @@ class BaseAppConfig(BaseModel):
     smtp_password: str = ""
     email_subject: str = "Fenrir Auth Token"
 
+    # Database settings
+    database_type: str = "postgresql"
+    db_host: str = "localhost"
+    db_port: int = 5432
+    postgres_db: str = "fenrir"
+    postgres_user: str = "fenrir"
+    postgres_password: str = "fenrirpass"
+
 
 def get_base_app_config() -> BaseAppConfig:
     load_dotenv()
@@ -54,6 +62,13 @@ def get_base_app_config() -> BaseAppConfig:
         smtp_username=os.getenv("EMAIL_USER", ""),
         smtp_password=os.getenv("EMAIL_PASSWORD", ""),
         email_subject=os.getenv("EMAIL_SUBJECT", "Fenrir Auth Token"),
+        # Database settings from environment
+        database_type=os.getenv("DATABASE_TYPE", "postgresql"),
+        db_host=os.getenv("DB_HOST", "localhost"),
+        db_port=int(os.getenv("DB_PORT", "5432")),
+        postgres_db=os.getenv("POSTGRES_DB", "fenrir"),
+        postgres_user=os.getenv("POSTGRES_USER", "fenrir"),
+        postgres_password=os.getenv("POSTGRES_PASSWORD", "fenrirpass"),
     )
 
 

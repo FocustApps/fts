@@ -270,7 +270,7 @@ def get_database_url_from_config() -> str:
 
     config = get_config()
 
-    if config.database_type.lower() == "postgresql":
+    if config.database_type.lower() in ["postgresql", "postgres"]:
         return f"postgresql://{config.postgres_user}:{config.postgres_password}@{config.db_host}:{config.db_port}/{config.postgres_db}"
     elif config.database_type.lower() == "sqlite":
         return f"sqlite:///{config.database_url}"
