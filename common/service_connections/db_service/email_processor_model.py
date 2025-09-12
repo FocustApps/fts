@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy.orm import Session
 from pydantic import BaseModel

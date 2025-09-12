@@ -22,7 +22,7 @@ class IdentifierModel(BaseModel):
     - locator_query (str): The query used to locate the web element.
     - environments (List): A list of environments where the identifier is applicable.
     """
-    
+
     id: int
     page_id: int
     element_name: str

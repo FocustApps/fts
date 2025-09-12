@@ -11,7 +11,6 @@ from typing import List, Optional
 
 import sqlalchemy as sql
 from sqlalchemy import create_engine
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -26,6 +25,7 @@ Base = declarative_base()
 
 class SystemEnum(StrEnum):
     """Enumeration of supported systems for email processing."""
+
     MINER_OCR = "miner_ocr"
     TRUE_SOURCE_OCR = "true_source_ocr"
 
@@ -36,6 +36,7 @@ class SystemEnum(StrEnum):
     @staticmethod
     def is_valid_system(system: str):
         return system in SystemEnum.get_valid_systems()
+
 
 from datetime import datetime
 from typing import Dict, List, Optional
