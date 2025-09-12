@@ -3,33 +3,12 @@ from typing import List, Optional
 from datetime import datetime
 
 from pydantic import BaseModel
-import sqlalchemy as sql
 from sqlalchemy import Engine
-from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
-    declarative_base,
-    Session,
-)
+from sqlalchemy.orm import Session
 
-from common.service_connections.db_service.user_model import UserTable, UserModel
-
-
-Base = declarative_base()
-
-
-class EnvironmentTable(Base):
-    __tablename__ = "environment"
-
-    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(sql.String(96), unique=True)
-    environment_designation: Mapped[str] = mapped_column(sql.String(80))
-    url: Mapped[str] = mapped_column(sql.String(512))
-    api_url: Mapped[Optional[str]] = mapped_column(sql.String(512), default=None)
-    status: Mapped[str] = mapped_column(sql.String(96))
-    created_at: Mapped[datetime] = mapped_column(sql.DateTime)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime, default=None)
-    users: Mapped[Optional[List]] = mapped_column(sql.JSON, default=[])
+# Import centralized database components
+from .database import EnvironmentTable, UserTable
+from .user_model import UserModel
 
 
 class EnvironmentModel(BaseModel):

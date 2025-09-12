@@ -1,32 +1,12 @@
 from typing import List
 from datetime import datetime
 
-import sqlalchemy as sql
 from sqlalchemy import Engine
-from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
-    declarative_base,
-    Session,
-)
-
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-
-Base = declarative_base()
-
-
-class IdentifierTable(Base):
-    __tablename__ = "identifier"
-
-    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
-    page_id: Mapped[int] = mapped_column(sql.Integer)
-    element_name: Mapped[str] = mapped_column(sql.String(96), unique=True)
-    created_at: Mapped[datetime] = mapped_column(sql.DateTime)
-    updated_at: Mapped[datetime] = mapped_column(sql.DateTime)
-    locator_strategy: Mapped[str] = mapped_column(sql.String(96))
-    locator_query: Mapped[str] = mapped_column(sql.String(96))
-    environments: Mapped[List] = mapped_column(sql.JSON, default=[])
+# Import centralized database components
+from .database import IdentifierTable
 
 
 class IdentifierModel(BaseModel):

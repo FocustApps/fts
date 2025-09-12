@@ -3,47 +3,10 @@ from datetime import datetime
 import logging
 
 from pydantic import BaseModel
-import sqlalchemy as sql
-from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
-    declarative_base,
-    Session,
-)
+from sqlalchemy.orm import Session
 
-
-Base = declarative_base()
-
-
-class UserTable(Base):
-    __tablename__ = "user"
-
-    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
-    username: Mapped[str] = mapped_column(sql.String(96), unique=True)
-    email: Mapped[str] = mapped_column(sql.String(96))
-    _password: Mapped[Optional[str]] = mapped_column(sql.String(96), name="password")
-    secret_provider: Mapped[Optional[str]] = mapped_column(sql.String(96))
-    secret_url: Mapped[Optional[str]] = mapped_column(sql.String(1024))
-    secret_name: Mapped[Optional[str]] = mapped_column(sql.String(1024))
-    environment_id: Mapped[int] = mapped_column(sql.Integer)
-    created_at: Mapped[datetime] = mapped_column(sql.DateTime)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime, default=None)
-
-    def _obfuscate(self, value):
-        return f"{value[0]}{'*' * (len(value) - 2)}{value[-1]}"
-
-    @hybrid_property
-    def password(self):
-        return self._obfuscate(self._password)
-
-    @password.setter
-    def password(self, value):
-        self._password = value
-
-    @password.expression
-    def password(cls):
-        return cls._password
+# Import centralized database components
+from .database import UserTable
 
 
 class UserModel(BaseModel):

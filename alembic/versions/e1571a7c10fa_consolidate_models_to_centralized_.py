@@ -1,8 +1,8 @@
-"""Add test migration field to pages
+"""Consolidate models to centralized database.py
 
-Revision ID: ff21978b9d56
+Revision ID: e1571a7c10fa
 Revises: f427ef5ef811
-Create Date: 2025-09-12 13:50:50.548358
+Create Date: 2025-09-12 15:13:20.059466
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'ff21978b9d56'
+revision = 'e1571a7c10fa'
 down_revision = 'f427ef5ef811'
 branch_labels = None
 depends_on = None
@@ -49,7 +49,6 @@ def upgrade() -> None:
     op.drop_index(op.f('idx_identifier_element_name'), table_name='identifier')
     op.drop_index(op.f('idx_identifier_locator_strategy'), table_name='identifier')
     op.drop_index(op.f('idx_identifier_page_id'), table_name='identifier')
-    op.add_column('page', sa.Column('test_migration_field', sa.String(length=255), nullable=True))
     op.drop_index(op.f('idx_page_environments'), table_name='page', postgresql_using='gin')
     op.drop_index(op.f('idx_page_identifiers'), table_name='page', postgresql_using='gin')
     op.drop_index(op.f('idx_page_page_name'), table_name='page')
@@ -67,7 +66,6 @@ def downgrade() -> None:
     op.create_index(op.f('idx_page_page_name'), 'page', ['page_name'], unique=False)
     op.create_index(op.f('idx_page_identifiers'), 'page', ['identifiers'], unique=False, postgresql_using='gin')
     op.create_index(op.f('idx_page_environments'), 'page', ['environments'], unique=False, postgresql_using='gin')
-    op.drop_column('page', 'test_migration_field')
     op.create_index(op.f('idx_identifier_page_id'), 'identifier', ['page_id'], unique=False)
     op.create_index(op.f('idx_identifier_locator_strategy'), 'identifier', ['locator_strategy'], unique=False)
     op.create_index(op.f('idx_identifier_element_name'), 'identifier', ['element_name'], unique=False)

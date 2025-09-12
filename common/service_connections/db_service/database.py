@@ -1,12 +1,41 @@
 """
-Centralized database configuration and base model for Fenrir.
+Centralized database models and configuration for the FTS application.
 
-This module provides:
-1. Single source of truth for all database models
-2. Base class for all SQLAlchemy models
-3. Database initialization and migration support
-4. Centralized engine and session management
+This module serves as the single source of truth for all database table definitions,
+using SQLAlchemy ORM with Alembic for migration management.
 """
+
+from datetime import datetime
+from enum import StrEnum
+from typing import List, Optional
+
+import sqlalchemy as sql
+from sqlalchemy import create_engine
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    declarative_base,
+    sessionmaker,
+)
+
+
+# Single declarative base for all models
+Base = declarative_base()
+
+
+class SystemEnum(StrEnum):
+    """Enumeration of supported systems for email processing."""
+    MINER_OCR = "miner_ocr"
+    TRUE_SOURCE_OCR = "true_source_ocr"
+
+    @staticmethod
+    def get_valid_systems():
+        return [system.value for system in SystemEnum]
+
+    @staticmethod
+    def is_valid_system(system: str):
+        return system in SystemEnum.get_valid_systems()
 
 from datetime import datetime
 from typing import Dict, List, Optional

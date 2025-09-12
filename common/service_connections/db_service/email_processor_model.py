@@ -1,52 +1,12 @@
 from datetime import datetime
-from enum import StrEnum
 import logging
 from typing import List, Optional
 
-import sqlalchemy as sql
-from sqlalchemy.orm import Mapped, mapped_column, declarative_base, Session
-
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-
-Base = declarative_base()
-
-
-class SystemEnum(StrEnum):
-    MINER_OCR = "miner_ocr"
-    TRUE_SOURCE_OCR = "true_source_ocr"
-
-    @staticmethod
-    def get_valid_systems():
-        return [system.value for system in SystemEnum]
-
-    @staticmethod
-    def is_valid_system(system: str):
-        return system in SystemEnum.get_valid_systems()
-
-
-class EmailProcessorTable(Base):
-    __tablename__ = "emailProcessorTable"
-
-    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
-    email_item_id: Mapped[int] = mapped_column(sql.Integer, unique=True)
-    multi_item_email_ids: Mapped[Optional[List]] = mapped_column(
-        sql.JSON(sql.JSON), default=None
-    )
-    multi_email_flag: Mapped[Optional[bool]] = mapped_column(sql.Boolean, default=False)
-    multi_attachment_flag: Mapped[Optional[bool]] = mapped_column(
-        sql.Boolean, default=False
-    )
-    test_name: Mapped[Optional[str]] = mapped_column(sql.String, default=None)
-    requires_processing: Mapped[Optional[bool]] = mapped_column(
-        sql.Boolean, default=False
-    )
-    system: Mapped[str] = mapped_column(sql.String)
-    created_at: Mapped[datetime] = mapped_column(sql.DateTime)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime, default=None)
-    last_processed_at: Mapped[Optional[datetime]] = mapped_column(
-        sql.DateTime, default=None
-    )
+# Import centralized database components
+from .database import EmailProcessorTable, SystemEnum
 
 
 class EmailProcessorModel(BaseModel):
