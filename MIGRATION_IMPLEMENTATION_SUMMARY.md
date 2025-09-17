@@ -92,7 +92,7 @@ python manage_db.py history                   # View history
 
 ### Migration History
 
-```
+```text
 f427ef5ef811 - Initial schema from existing models
 e1571a7c10fa - Consolidate models to centralized database.py (current head)
 ```

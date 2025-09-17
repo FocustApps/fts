@@ -22,7 +22,7 @@ This guide explains the new database management approach for Fenrir that replace
 
 ## 🏗️ Architecture Overview
 
-```
+```text
 fts/
 ├── common/service_connections/db_service/
 │   ├── database.py              # 🔥 NEW: Central models & engine config
