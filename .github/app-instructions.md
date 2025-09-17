@@ -162,6 +162,24 @@ except RuntimeError:
 - Convert service configs when moving across layers (e.g., ReportingServiceConfig → DatabaseServiceConfig).
 - Avoid SQLite-only args with Postgres/MSSQL.
 
+### Database Implementation Documentation
+
+The FTS project maintains comprehensive implementation documentation in `docs/implementation/`:
+
+- **`docs/implementation/DATABASE_MIGRATION_GUIDE.md`** - Complete guide for using SQLAlchemy + Alembic database migrations
+- **`docs/implementation/MIGRATION_IMPLEMENTATION_SUMMARY.md`** - Summary of the database migration system implementation  
+- **`docs/implementation/MULTI_USER_AUTH_IMPLEMENTATION.md`** - Detailed documentation of the multi-user authentication system
+- **`docs/implementation/README.md`** - Overview of all implementation documentation
+
+These documents serve as:
+
+- **Implementation records** for major system features
+- **Technical reference** for developers working on related systems
+- **Context documentation** for understanding architectural decisions
+- **AI assistant context** for future development sessions
+
+Reference these documents when working on authentication, database migrations, or related system components.
+
 ## HTMX patterns and recipes
 
 Use these patterns to build interactive features with server-side rendering while keeping behavior consistent across the app.

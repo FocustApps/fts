@@ -34,6 +34,26 @@ class BaseAppConfig(BaseModel):
     postgres_user: str = "fenrir"
     postgres_password: str = "fenrirpass"
 
+    # Storage settings for authentication tokens
+    storage_enabled: bool = False
+    storage_provider_type: str = "local"  # Options: "local", "aws_s3", "azure_blob"
+
+    # Local storage settings
+    storage_local_base_directory: str = "./data/tokens"
+
+    # AWS S3 storage settings
+    storage_aws_bucket_name: str = "fenrir-auth-tokens"
+    storage_aws_prefix: str = "tokens/"
+    storage_aws_region: str = "us-east-1"
+    # AWS credentials are handled via environment variables or IAM roles
+
+    # Azure Blob storage settings
+    storage_azure_container_name: str = "fenrir-auth-tokens"
+    storage_azure_prefix: str = "tokens/"
+    storage_azure_connection_string: str = ""
+    storage_azure_account_name: str = ""
+    storage_azure_account_key: str = ""
+
 
 def get_base_app_config() -> BaseAppConfig:
     load_dotenv()
@@ -69,8 +89,78 @@ def get_base_app_config() -> BaseAppConfig:
         postgres_db=os.getenv("POSTGRES_DB", "fenrir"),
         postgres_user=os.getenv("POSTGRES_USER", "fenrir"),
         postgres_password=os.getenv("POSTGRES_PASSWORD", "fenrirpass"),
+        # Storage settings from environment
+        storage_enabled=os.getenv("STORAGE_ENABLED", "false").lower() == "true",
+        storage_provider_type=os.getenv("STORAGE_PROVIDER_TYPE", "local"),
+        # Local storage settings
+        storage_local_base_directory=os.getenv(
+            "STORAGE_LOCAL_BASE_DIRECTORY", "./data/tokens"
+        ),
+        # AWS S3 storage settings
+        storage_aws_bucket_name=os.getenv(
+            "STORAGE_AWS_BUCKET_NAME", "fenrir-auth-tokens"
+        ),
+        storage_aws_prefix=os.getenv("STORAGE_AWS_PREFIX", "tokens/"),
+        storage_aws_region=os.getenv("STORAGE_AWS_REGION", "us-east-1"),
+        # Azure Blob storage settings
+        storage_azure_container_name=os.getenv(
+            "STORAGE_AZURE_CONTAINER_NAME", "fenrir-auth-tokens"
+        ),
+        storage_azure_prefix=os.getenv("STORAGE_AZURE_PREFIX", "tokens/"),
+        storage_azure_connection_string=os.getenv("STORAGE_AZURE_CONNECTION_STRING", ""),
+        storage_azure_account_name=os.getenv("STORAGE_AZURE_ACCOUNT_NAME", ""),
+        storage_azure_account_key=os.getenv("STORAGE_AZURE_ACCOUNT_KEY", ""),
     )
 
 
 # Alias for easier import
 get_config = get_base_app_config
+
+
+def get_storage_config(app_config: BaseAppConfig = None) -> dict:
+    """
+    Build storage configuration from app config.
+
+    Args:
+        app_config: App configuration instance. If None, will get fresh config.
+
+    Returns:
+        dict: Storage configuration ready for StorageService
+    """
+    if app_config is None:
+        app_config = get_base_app_config()
+
+    # Build provider-specific configuration
+    if app_config.storage_provider_type == "local":
+        provider_config = {"base_directory": app_config.storage_local_base_directory}
+    elif app_config.storage_provider_type == "aws_s3":
+        provider_config = {
+            "bucket_name": app_config.storage_aws_bucket_name,
+            "prefix": app_config.storage_aws_prefix,
+            "region": app_config.storage_aws_region,
+        }
+    elif app_config.storage_provider_type == "azure_blob":
+        provider_config = {
+            "container_name": app_config.storage_azure_container_name,
+            "prefix": app_config.storage_azure_prefix,
+        }
+
+        # Add credentials if available (prefer connection string)
+        if app_config.storage_azure_connection_string:
+            provider_config["connection_string"] = (
+                app_config.storage_azure_connection_string
+            )
+        elif (
+            app_config.storage_azure_account_name and app_config.storage_azure_account_key
+        ):
+            provider_config["account_name"] = app_config.storage_azure_account_name
+            provider_config["account_key"] = app_config.storage_azure_account_key
+    else:
+        # Fallback to local storage for unknown provider types
+        provider_config = {"base_directory": "./data/tokens"}
+        app_config.storage_provider_type = "local"
+
+    return {
+        "provider_type": app_config.storage_provider_type,
+        "provider_config": provider_config,
+    }

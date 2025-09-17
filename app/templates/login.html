@@ -55,6 +55,15 @@
 
                         <!-- Login Form -->
                         <form id="login-form" hx-post="/auth/login" hx-target="#alert-container" hx-swap="innerHTML">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control form-control-lg" id="email" name="email"
+                                    placeholder="Enter your email address" required autocomplete="email">
+                                <div class="form-text">
+                                    Enter the email address associated with your authentication token.
+                                </div>
+                            </div>
+
                             <div class="mb-4">
                                 <label for="token" class="form-label">Authentication Token</label>
                                 <input type="password" class="form-control form-control-lg" id="token" name="token"
@@ -129,10 +138,13 @@
         document.addEventListener('htmx:responseError', function (event) {
             if (event.target.id === 'login-form') {
                 // Form validation feedback
+                const emailInput = document.getElementById('email');
                 const tokenInput = document.getElementById('token');
+                emailInput.classList.add('is-invalid');
                 tokenInput.classList.add('is-invalid');
 
                 setTimeout(() => {
+                    emailInput.classList.remove('is-invalid');
                     tokenInput.classList.remove('is-invalid');
                 }, 3000);
             }

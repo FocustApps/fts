@@ -170,6 +170,41 @@ class EmailProcessorTable(Base):
         return f"<EmailProcessor(id={self.id}, email_item_id={self.email_item_id}, system='{self.system}')>"
 
 
+class AuthUserTable(Base):
+    """Authentication users table for system access control."""
+
+    __tablename__ = "auth_users"
+
+    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(sql.String(255), unique=True, nullable=False)
+    username: Mapped[Optional[str]] = mapped_column(sql.String(96))
+    current_token: Mapped[Optional[str]] = mapped_column(sql.String(64))
+    token_expires_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
+    is_active: Mapped[bool] = mapped_column(sql.Boolean, default=True, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(sql.Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        sql.DateTime, nullable=False, default=datetime.utcnow
+    )
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
+
+    def __repr__(self) -> str:
+        return (
+            f"<AuthUser(id={self.id}, email='{self.email}', is_active={self.is_active})>"
+        )
+
+    def is_token_valid(self) -> bool:
+        """Check if the current token is valid and not expired."""
+        if not self.current_token or not self.token_expires_at:
+            return False
+        return datetime.utcnow() < self.token_expires_at
+
+    def update_last_login(self) -> None:
+        """Update the last login timestamp to now."""
+        self.last_login_at = datetime.utcnow()
+        self.updated_at = datetime.utcnow()
+
+
 # =====================================
 # Database Engine and Session Management
 # =====================================
@@ -279,6 +314,56 @@ def get_database_url_from_config() -> str:
         raise ValueError(f"Unsupported database type: {config.database_type}")
 
 
+# =====================================
+# Session Context Manager
+# =====================================
+
+
+from contextlib import contextmanager
+from typing import Generator
+
+
+# Global session factory - will be initialized when module is imported
+_session_factory: Optional[sessionmaker[Session]] = None
+
+
+def _initialize_session_factory() -> sessionmaker[Session]:
+    """Initialize the global session factory using the database URL from config."""
+    global _session_factory
+    if _session_factory is None:
+        database_url = get_database_url_from_config()
+        engine = create_database_engine(database_url)
+        _session_factory = create_session_factory(engine)
+    return _session_factory
+
+
+@contextmanager
+def get_database_session() -> Generator[Session, None, None]:
+    """
+    Context manager for database sessions.
+
+    Provides a database session with automatic transaction management.
+    Commits on success, rolls back on exception.
+
+    Yields:
+        Database session
+
+    Example:
+        with get_database_session() as session:
+            user = session.query(AuthUserTable).filter_by(email="test@example.com").first()
+    """
+    session_factory = _initialize_session_factory()
+    session = session_factory()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 # Export commonly used items
 __all__ = [
     "Base",
@@ -287,10 +372,12 @@ __all__ = [
     "UserTable",
     "IdentifierTable",
     "EmailProcessorTable",
+    "AuthUserTable",
     "create_database_engine",
     "create_session_factory",
     "create_all_tables",
     "drop_all_tables",
     "initialize_database",
     "get_database_url_from_config",
+    "get_database_session",
 ]

@@ -41,6 +41,8 @@ dependencies = [
     "boto3>=1.36.16,<2",
     "psycopg2-binary>=2.9.10",
     "pytest-asyncio>=1.1.0",
+    "email-validator>=2.3.0",
+    "aiofiles>=24.1.0,<25",
 ]
 
 [dependency-groups]

@@ -43,7 +43,9 @@ templates = Jinja2Templates(directory=f"{get_template_folder()}")
 for router in API_ROUTERS:
     logging.debug(f"Adding router: {router.prefix}")
     # Auth view routes should be at root level (no API version prefix)
-    if router.prefix == "/auth" and "auth-views" in router.tags:
+    if (router.prefix == "/auth" and "auth-views" in router.tags) or (
+        router.prefix == "/auth-users" and "auth-users-views" in router.tags
+    ):
         app.include_router(router)
     else:
         app.include_router(prefix=f"/{BASE_CONFIG.api_version}", router=router)
@@ -65,6 +67,7 @@ async def root_page(request: Request):
         "Users": "get_users",
         "Pages": "get_pages",
         "Email Processing Items": "get_email_processing_items",
+        "Auth Users": "get_auth_users_view",
     }
 
     return templates.TemplateResponse(
