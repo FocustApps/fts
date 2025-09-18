@@ -6,7 +6,7 @@ Stores tokens as text files in an S3 bucket with organized key structure.
 
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from app.services.storage.base import StorageProvider, StorageError
@@ -95,7 +95,7 @@ class AWSS3Provider(StorageProvider):
                 ContentType="text/plain",
                 Metadata={
                     "user_email": user_email,
-                    "generated_at": datetime.utcnow().isoformat(),
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
                     "expires_at": expires_at.isoformat(),
                 },
             )

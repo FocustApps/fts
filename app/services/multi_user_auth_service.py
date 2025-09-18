@@ -5,7 +5,7 @@ Extends the existing AuthService to support multiple users with database-backed
 token management and email-specific authentication flows.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -101,7 +101,7 @@ class MultiUserAuthService:
                     username=username,
                     is_admin=is_admin,
                     is_active=True,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                 )
 
                 session.add(new_user)
@@ -159,12 +159,14 @@ class MultiUserAuthService:
 
                 # Generate new token
                 new_token = self._base_auth_service.generate_token()
-                expires_at = datetime.utcnow() + timedelta(hours=self.token_expiry_hours)
+                expires_at = datetime.now(timezone.utc) + timedelta(
+                    hours=self.token_expiry_hours
+                )
 
                 # Update user record
                 user.current_token = new_token
                 user.token_expires_at = expires_at
-                user.updated_at = datetime.utcnow()
+                user.updated_at = datetime.now(timezone.utc)
 
                 session.commit()
 
@@ -222,7 +224,7 @@ class MultiUserAuthService:
                 token=token,
                 token_expires_at=expires_at.isoformat(),
                 additional_metadata={
-                    "generated_at": datetime.utcnow().isoformat(),
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
                     "expiry_hours": str(self.token_expiry_hours),
                 },
             )
@@ -260,7 +262,7 @@ class MultiUserAuthService:
                 if (
                     user.current_token == provided_token
                     and user.token_expires_at
-                    and datetime.utcnow() < user.token_expires_at
+                    and datetime.now(timezone.utc) < user.token_expires_at
                 ):
 
                     # Update last login time
@@ -334,7 +336,7 @@ class MultiUserAuthService:
                 user.is_active = False
                 user.current_token = None
                 user.token_expires_at = None
-                user.updated_at = datetime.utcnow()
+                user.updated_at = datetime.now(timezone.utc)
 
                 session.commit()
 
@@ -377,7 +379,7 @@ class MultiUserAuthService:
                 expired_users = (
                     session.query(AuthUserTable)
                     .filter(
-                        AuthUserTable.token_expires_at < datetime.utcnow(),
+                        AuthUserTable.token_expires_at < datetime.now(timezone.utc),
                         AuthUserTable.current_token.isnot(None),
                     )
                     .all()
@@ -387,7 +389,7 @@ class MultiUserAuthService:
                 for user in expired_users:
                     user.current_token = None
                     user.token_expires_at = None
-                    user.updated_at = datetime.utcnow()
+                    user.updated_at = datetime.now(timezone.utc)
                     count += 1
 
                 session.commit()
@@ -439,7 +441,7 @@ class MultiUserAuthService:
                 # Invalidate the token
                 user.current_token = None
                 user.token_expires_at = None
-                user.updated_at = datetime.utcnow()
+                user.updated_at = datetime.now(timezone.utc)
 
                 session.commit()
 
@@ -478,7 +480,7 @@ class MultiUserAuthService:
                 # Clear all token information
                 user.current_token = None
                 user.token_expires_at = None
-                user.updated_at = datetime.utcnow()
+                user.updated_at = datetime.now(timezone.utc)
 
                 session.commit()
 

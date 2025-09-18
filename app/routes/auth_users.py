@@ -8,7 +8,7 @@ Provides admin interface for managing multi-user authentication:
 - Deactivating users
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse
@@ -459,7 +459,7 @@ async def generate_token_api(
             "message": "Token generated successfully and emailed to user",
             "user_email": user.email,
             "token": new_token,
-            "expires_at": (datetime.utcnow() + timedelta(hours=24)).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
         }
 
     except HTTPException:

@@ -6,7 +6,7 @@ such as AWS S3, Azure Blob Storage, local file system, or cloud secrets managers
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 
@@ -115,7 +115,7 @@ class StorageProvider(ABC):
             Generated filename
         """
         if timestamp is None:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc)
 
         # Create safe filename from email
         safe_email = user_email.replace("@", "_at_").replace(".", "_")
@@ -148,7 +148,7 @@ class StorageProvider(ABC):
 User Email: {user_email}
 Username: {username or 'Not specified'}
 Token: {token}
-Generated: {datetime.utcnow().isoformat()}Z
+Generated: {datetime.now(timezone.utc).isoformat()}Z
 Expires: {expires_at.isoformat()}Z
 Valid for: 24 hours
 

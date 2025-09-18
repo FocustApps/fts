@@ -65,7 +65,6 @@ def query_user_by_username(username: str, session: Session, engine) -> UserModel
     if not user:
         raise ValueError(f"Username {username} not found.")
     unpacked_user = UserModel(**user.__dict__)
-    unpacked_user.password = user._password
     return unpacked_user
 
 
@@ -78,7 +77,6 @@ def query_user_by_id(user_id: int, session: Session, engine) -> UserModel:
     if not user:
         raise ValueError(f"User ID with {user_id} not found.")
     unpacked_user = UserModel(**user.__dict__)
-    unpacked_user.password = user._password
     return unpacked_user
 
 

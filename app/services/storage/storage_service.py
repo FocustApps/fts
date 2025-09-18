@@ -233,7 +233,7 @@ class StorageService:
             return False
 
         # For now, return False - implement actual expiration logic based on your needs
-        # Example: parse expires_at timestamp and compare with datetime.utcnow()
+        # Example: parse expires_at timestamp and compare with datetime.now(timezone.utc)
         return False
 
     async def health_check(self) -> Dict[str, Any]:

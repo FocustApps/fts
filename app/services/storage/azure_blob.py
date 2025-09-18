@@ -6,7 +6,7 @@ Stores tokens as text files in an Azure Blob Storage container.
 
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from app.services.storage.base import StorageProvider, StorageError
@@ -110,7 +110,7 @@ class AzureBlobProvider(StorageProvider):
                 content_type="text/plain",
                 metadata={
                     "user_email": user_email,
-                    "generated_at": datetime.utcnow().isoformat(),
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
                     "expires_at": expires_at.isoformat(),
                 },
                 overwrite=True,

@@ -5,7 +5,7 @@ This module serves as the single source of truth for all database table definiti
 using SQLAlchemy ORM with Alembic for migration management.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import List, Optional
 
@@ -115,7 +115,7 @@ class UserTable(Base):
         sql.Integer, sql.ForeignKey("environment.id", ondelete="CASCADE"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow
+        sql.DateTime, nullable=False, default=datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
 
@@ -197,12 +197,12 @@ class AuthUserTable(Base):
         """Check if the current token is valid and not expired."""
         if not self.current_token or not self.token_expires_at:
             return False
-        return datetime.utcnow() < self.token_expires_at
+        return datetime.now(timezone.utc) < self.token_expires_at
 
     def update_last_login(self) -> None:
         """Update the last login timestamp to now."""
-        self.last_login_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.last_login_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
 
 # =====================================

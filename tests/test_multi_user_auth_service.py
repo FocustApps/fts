@@ -13,7 +13,7 @@ This test suite includes:
 import asyncio
 import random
 from unittest.mock import patch
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import contextmanager
 
 import pytest
@@ -52,7 +52,7 @@ class MockEmailService:
                 "token": token,
                 "username": username,
                 "is_new_user": is_new_user,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(timezone.utc),
             }
         )
         return True
