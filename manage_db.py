@@ -14,10 +14,12 @@ Usage:
     python manage_db.py history      # Show migration history
     python manage_db.py create-all   # Create all tables (bypass migrations)
     python manage_db.py drop-all     # Drop all tables (DANGEROUS!)
+    python manage_db.py seed-admin   # Seed admin user from .env EMAIL_RECIPIENT
 """
 
 import sys
 import subprocess
+import asyncio
 from pathlib import Path
 
 # Add the project root to the path
@@ -140,6 +142,64 @@ def drop_tables() -> None:
         sys.exit(1)
 
 
+async def seed_admin_user() -> None:
+    """Seed admin user from .env configuration."""
+    print("🌱 Seeding admin user from .env configuration...")
+    try:
+        from app.config import get_config
+        from app.services.multi_user_auth_service import get_multi_user_auth_service
+
+        # Get configuration
+        config = get_config()
+        admin_email = config.email_recipient
+
+        if not admin_email:
+            print("❌ Error: EMAIL_RECIPIENT not found in .env file")
+            return
+
+        print(f"Adding admin user: {admin_email}")
+
+        # Get auth service
+        auth_service = get_multi_user_auth_service()
+
+        # Extract username from email
+        username = admin_email.split("@")[0]
+
+        try:
+            # Add admin user
+            user = await auth_service.add_user(
+                email=admin_email,
+                username=username,
+                is_admin=True,
+                send_welcome_email=True,
+            )
+
+            print(f"✅ Admin user created successfully!")
+            print(f"   Email: {user.email}")
+            print(f"   Username: {user.username}")
+            print(f"   Admin: {user.is_admin}")
+            print(f"📧 Welcome email with authentication token sent")
+
+        except Exception as e:
+            if "already exists" in str(e):
+                print(f"ℹ️  User {admin_email} already exists")
+
+                # Generate a new token for existing user
+                try:
+                    await auth_service.generate_user_token(admin_email, send_email=True)
+                    print(f"📧 New authentication token sent to {admin_email}")
+                except Exception as token_error:
+                    print(f"❌ Error generating new token: {token_error}")
+                    sys.exit(1)
+            else:
+                print(f"❌ Error creating admin user: {e}")
+                sys.exit(1)
+
+    except Exception as e:
+        print(f"❌ Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """Main CLI entry point."""
     if len(sys.argv) < 2:
@@ -169,6 +229,8 @@ def main():
         create_tables_directly()
     elif command == "drop-all":
         drop_tables()
+    elif command == "seed-admin":
+        asyncio.run(seed_admin_user())
     else:
         print(f"Unknown command: {command}")
         print(__doc__)

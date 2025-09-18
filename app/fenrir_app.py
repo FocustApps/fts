@@ -54,6 +54,7 @@ for router in API_ROUTERS:
 @app.get("/", response_class=HTMLResponse)
 async def root_page(request: Request):
     from app.routes.auth import get_auth_token_from_cookie
+    from app.dependencies.multi_user_auth_dependency import verify_multi_user_auth_token
     from fastapi.responses import RedirectResponse
 
     # Check if user is authenticated via cookie
@@ -61,6 +62,25 @@ async def root_page(request: Request):
     if not auth_token:
         # Redirect to login page if not authenticated
         return RedirectResponse(url="/auth/login", status_code=302)
+
+    # Get current user context for navbar
+    current_user = None
+    try:
+        auth_context = await verify_multi_user_auth_token(request)
+        current_user = {
+            "username": auth_context.username
+            or (
+                auth_context.user_email.split("@")[0]
+                if auth_context.user_email
+                else "User"
+            ),
+            "email": auth_context.user_email,
+            "is_admin": auth_context.is_admin,
+        }
+    except Exception as e:
+        logging.warning(f"Failed to get user context: {e}")
+        # For legacy tokens or errors, create minimal user context
+        current_user = {"username": "User", "email": None, "is_admin": False}
 
     navigation_routes = {
         "Environments": "get_environments",
@@ -71,5 +91,10 @@ async def root_page(request: Request):
     }
 
     return templates.TemplateResponse(
-        "index.html", {"request": request, "navigation": navigation_routes}
+        "index.html",
+        {
+            "request": request,
+            "navigation": navigation_routes,
+            "current_user": current_user,
+        },
     )

@@ -1,15 +1,13 @@
 """
 Multi-user authentication dependency for FastAPI.
 
-Provides authentication dependencies that support both the legacy single-user
-token system and the new multi-user email-based authentication system.
+Provides authentication dependencies for the multi-user email-based authentication system.
 """
 
 from fastapi import HTTPException, Request, status
 from typing import Optional
 from dataclasses import dataclass
 
-from app.services.auth_service import get_auth_service, AuthTokenError
 from app.services.multi_user_auth_service import (
     get_multi_user_auth_service,
     MultiUserAuthError,
@@ -24,21 +22,15 @@ class AuthContext:
     """Authentication context containing user and token information."""
 
     token: str
-    user_email: Optional[str] = None
-    user_id: Optional[int] = None
-    username: Optional[str] = None
+    user_email: str
+    user_id: int
+    username: str
     is_admin: bool = False
-    is_legacy_token: bool = False
 
 
 async def verify_multi_user_auth_token(request: Request) -> AuthContext:
     """
     FastAPI dependency that validates tokens in multi-user authentication system.
-
-    Supports both legacy single-user tokens and new multi-user email-based tokens.
-    Priority order:
-    1. Multi-user tokens (database-backed, email-specific)
-    2. Legacy single-user tokens (file-based, global)
 
     Args:
         request: FastAPI request object
@@ -61,13 +53,8 @@ async def verify_multi_user_auth_token(request: Request) -> AuthContext:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Try multi-user authentication first
+        # Validate multi-user authentication
         auth_context = await _validate_multi_user_token(auth_token, request)
-        if auth_context:
-            return auth_context
-
-        # Fallback to legacy single-user authentication
-        auth_context = await _validate_legacy_token(auth_token, request)
         if auth_context:
             return auth_context
 
@@ -83,7 +70,7 @@ async def verify_multi_user_auth_token(request: Request) -> AuthContext:
 
     except HTTPException:
         raise
-    except (AuthTokenError, MultiUserAuthError) as e:
+    except MultiUserAuthError as e:
         logger.error(f"Auth service error during validation: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -112,14 +99,7 @@ async def verify_admin_auth_token(request: Request) -> AuthContext:
     """
     auth_context = await verify_multi_user_auth_token(request)
 
-    # Legacy tokens are considered admin for backward compatibility
-    if auth_context.is_legacy_token:
-        logger.debug(
-            f"Admin access granted via legacy token from {_get_client_host(request)}"
-        )
-        return auth_context
-
-    # Check admin privileges for multi-user tokens
+    # Check admin privileges
     if not auth_context.is_admin:
         logger.warning(
             f"Admin access denied for user {auth_context.user_email} from {_get_client_host(request)}"
@@ -198,18 +178,16 @@ async def _validate_multi_user_token(
                         user_id=user.id,
                         username=user.username,
                         is_admin=user.is_admin,
-                        is_legacy_token=False,
                     )
             return None
 
-        # Fallback: If no email context, check all users (for backward compatibility)
-        # This should only happen during the transition period or for API calls without cookies
+        # If no email context, check all users (for API calls without cookies)
         users = multi_user_service.list_users(include_inactive=False)
 
         for user in users:
             if multi_user_service.validate_user_token(user.email, token):
                 logger.debug(
-                    f"Multi-user authentication successful for {user.email} from {_get_client_host(request)} (fallback method)"
+                    f"Multi-user authentication successful for {user.email} from {_get_client_host(request)}"
                 )
                 return AuthContext(
                     token=token,
@@ -217,7 +195,6 @@ async def _validate_multi_user_token(
                     user_id=user.id,
                     username=user.username,
                     is_admin=user.is_admin,
-                    is_legacy_token=False,
                 )
 
         # Token didn't match any user
@@ -231,49 +208,17 @@ async def _validate_multi_user_token(
         return None
 
 
-async def _validate_legacy_token(token: str, request: Request) -> Optional[AuthContext]:
-    """
-    Validate token against legacy single-user authentication system.
-
-    Returns AuthContext if valid, None if not valid.
-    """
-    try:
-        auth_service = get_auth_service()
-
-        if auth_service.validate_token(token):
-            logger.debug(
-                f"Legacy authentication successful from {_get_client_host(request)}"
-            )
-            return AuthContext(
-                token=token,
-                user_email=None,  # Legacy system doesn't track email
-                user_id=None,
-                username="Legacy User",
-                is_admin=True,  # Legacy tokens have admin privileges
-                is_legacy_token=True,
-            )
-
-        return None
-
-    except AuthTokenError as e:
-        logger.debug(f"Legacy token validation failed: {e}")
-        return None
-    except Exception as e:
-        logger.debug(f"Error during legacy token validation: {e}")
-        return None
-
-
 def _get_client_host(request: Request) -> str:
     """Get client host from request, with fallback."""
     return request.client.host if request.client else "unknown"
 
 
-# Backward compatibility aliases
+# Simplified authentication functions
 async def verify_auth_token(request: Request) -> str:
     """
-    Backward compatibility alias for existing code.
+    Get authentication token from request.
 
-    Returns just the token string like the original dependency.
+    Returns just the token string for compatibility with existing code.
     """
     auth_context = await verify_multi_user_auth_token(request)
     return auth_context.token
@@ -281,7 +226,7 @@ async def verify_auth_token(request: Request) -> str:
 
 async def verify_auth_token_optional(request: Request) -> Optional[str]:
     """
-    Backward compatibility alias for existing code.
+    Get authentication token from request without raising errors.
 
     Returns just the token string or None.
     """

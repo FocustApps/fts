@@ -401,6 +401,94 @@ class MultiUserAuthService:
             logger.error(f"Database error cleaning expired tokens: {e}")
             return 0
 
+    def invalidate_user_token(self, email: str, token: str) -> bool:
+        """
+        Invalidate a specific token for a user.
+
+        Args:
+            email: User's email address
+            token: Token to invalidate
+
+        Returns:
+            True if token was invalidated, False if not found or error
+
+        Raises:
+            MultiUserAuthError: If database operation fails
+        """
+        try:
+            with get_database_session() as session:
+                user = (
+                    session.query(AuthUserTable)
+                    .filter(AuthUserTable.email == email.lower())
+                    .first()
+                )
+
+                if not user:
+                    logger.warning(f"Cannot invalidate token: User {email} not found")
+                    return False
+
+                if not user.current_token:
+                    logger.debug(f"No active token to invalidate for user {email}")
+                    return False
+
+                # Check if the provided token matches the current token
+                if user.current_token != token:
+                    logger.warning(f"Token mismatch during invalidation for user {email}")
+                    return False
+
+                # Invalidate the token
+                user.current_token = None
+                user.token_expires_at = None
+                user.updated_at = datetime.utcnow()
+
+                session.commit()
+
+                logger.info(f"Token invalidated for user {email}")
+                return True
+
+        except SQLAlchemyError as e:
+            logger.error(f"Database error invalidating token for {email}: {e}")
+            raise MultiUserAuthError(f"Failed to invalidate token: {e}")
+
+    def invalidate_all_user_tokens(self, email: str) -> bool:
+        """
+        Invalidate all tokens for a specific user.
+
+        Args:
+            email: User's email address
+
+        Returns:
+            True if successful, False if user not found
+
+        Raises:
+            MultiUserAuthError: If database operation fails
+        """
+        try:
+            with get_database_session() as session:
+                user = (
+                    session.query(AuthUserTable)
+                    .filter(AuthUserTable.email == email.lower())
+                    .first()
+                )
+
+                if not user:
+                    logger.warning(f"Cannot invalidate tokens: User {email} not found")
+                    return False
+
+                # Clear all token information
+                user.current_token = None
+                user.token_expires_at = None
+                user.updated_at = datetime.utcnow()
+
+                session.commit()
+
+                logger.info(f"All tokens invalidated for user {email}")
+                return True
+
+        except SQLAlchemyError as e:
+            logger.error(f"Database error invalidating all tokens for {email}: {e}")
+            raise MultiUserAuthError(f"Failed to invalidate tokens: {e}")
+
 
 # Global instance for application use
 _multi_user_auth_service: Optional[MultiUserAuthService] = None
