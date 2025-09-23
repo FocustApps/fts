@@ -26,13 +26,32 @@ from app.services.multi_user_auth_service import (
 )
 from common.service_connections.db_service.database import AuthUserTable
 from common.app_logging import create_logging
+from fts.app.routes.template_dataclasses import ViewRecordDataclass
+
+
+class AuthUserDisplay:
+    """Simple display object for auth users that mimics model behavior for templates."""
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def __iter__(self):
+        """Allow iteration over attributes for template compatibility."""
+        for key, value in self.__dict__.items():
+            yield (key, value)
+
+    def model_dump(self):
+        """Provide model_dump method for compatibility."""
+        return self.__dict__
+
 
 logger = create_logging()
 
 # Create routers for API and view endpoints
 auth_users_api_router = APIRouter(prefix="/api/auth-users", tags=["auth-users-api"])
 auth_users_views_router = APIRouter(
-    prefix="/auth-users", tags=["auth-users-views"], include_in_schema=False
+    prefix="/auth/users", tags=["auth-users-views"], include_in_schema=False
 )
 
 # Template configuration
@@ -87,36 +106,42 @@ async def get_auth_users_view(
         auth_service = get_multi_user_auth_service()
         users = auth_service.list_users(include_inactive=True)
 
-        # Prepare data for table display
+        # Convert to display objects similar to users.py pattern
         user_data = []
         for user in users:
-            user_info = {
-                "id": user.id,
-                "email": user.email,
-                "username": user.username or "—",
-                "is_admin": "✓" if user.is_admin else "—",
-                "is_active": "✓" if user.is_active else "—",
-                "has_token": "✓" if user.current_token else "—",
-                "last_login": (
+            # Create display object with clean field names
+            user_display = AuthUserDisplay(
+                id=user.id,
+                email=user.email,
+                username=user.username or "—",
+                is_admin="✓" if user.is_admin else "—",
+                is_active="✓" if user.is_active else "—",
+                has_token="✓" if user.current_token else "—",
+                last_login_at=(
                     user.last_login_at.strftime("%Y-%m-%d %H:%M")
                     if user.last_login_at
                     else "Never"
                 ),
-                "created_at": user.created_at.strftime("%Y-%m-%d %H:%M"),
-            }
-            user_data.append(user_info)
+                created_at=user.created_at.strftime("%Y-%m-%d %H:%M"),
+            )
+            user_data.append(user_display)
 
-        # Headers for the table
-        headers = [
-            "ID",
-            "Email",
-            "Username",
-            "Admin",
-            "Active",
-            "Has Token",
-            "Last Login",
-            "Created",
-        ]
+        # Generate headers dynamically like users.py does
+        if user_data:
+            headers = [
+                key.replace("_", " ").title() for key in user_data[0].model_dump().keys()
+            ]
+        else:
+            headers = [
+                "Id",
+                "Email",
+                "Username",
+                "Is Admin",
+                "Is Active",
+                "Has Token",
+                "Last Login At",
+                "Created At",
+            ]
 
         return templates.TemplateResponse(
             "table.html",
@@ -144,58 +169,59 @@ async def get_auth_users_view(
         )
 
 
-@auth_users_views_router.get("/{user_id}", response_class=HTMLResponse)
+@auth_users_views_router.get("/{record_id}", response_class=HTMLResponse)
 async def view_auth_user(
     request: Request,
-    user_id: int,
+    record_id: int,
     auth_context: AuthContext = Depends(verify_admin_auth_token),
 ):
     """Display details for a specific auth user."""
     try:
         auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=True)
-
-        user = next((u for u in users if u.id == user_id), None)
+        user = auth_service.get_user_by_id(record_id)
         if not user:
             raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
 
-        user_data = {
-            "ID": user.id,
-            "Email": user.email,
-            "Username": user.username or "—",
-            "Is Admin": "Yes" if user.is_admin else "No",
-            "Is Active": "Yes" if user.is_active else "No",
-            "Has Current Token": "Yes" if user.current_token else "No",
-            "Token Expires": (
+        # Convert user to dict and mask sensitive data (similar to users.py pattern)
+        user_dict = {
+            "id": user.id,
+            "email": user.email,
+            "username": user.username or "—",
+            "is_admin": "Yes" if user.is_admin else "No",
+            "is_active": "Yes" if user.is_active else "No",
+            "current_token": (
+                "***" if user.current_token else "None"
+            ),  # Mask token like password
+            "token_expires_at": (
                 user.token_expires_at.strftime("%Y-%m-%d %H:%M UTC")
                 if user.token_expires_at
                 else "—"
             ),
-            "Last Login": (
+            "last_login_at": (
                 user.last_login_at.strftime("%Y-%m-%d %H:%M UTC")
                 if user.last_login_at
                 else "Never"
             ),
-            "Created": user.created_at.strftime("%Y-%m-%d %H:%M UTC"),
-            "Updated": (
+            "created_at": user.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+            "updated_at": (
                 user.updated_at.strftime("%Y-%m-%d %H:%M UTC") if user.updated_at else "—"
             ),
         }
 
         return templates.TemplateResponse(
-            "auth_users/user_detail.html",
-            {
-                "request": request,
-                "record": user_data,
-                "view_url": "get_auth_users_view",
-                "title": f"Auth User: {user.email}",
-            },
+            "view_record.html",
+            ViewRecordDataclass(
+                request=request,
+                record=user_dict,
+                view_url="get_auth_users_view",
+                edit_url="edit_auth_user",  # Placeholder for future edit functionality
+            ).model_dump(),
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error viewing auth user {user_id}: {e}")
+        logger.error(f"Error viewing auth user {record_id}: {e}")
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -315,10 +341,10 @@ async def generate_token_view(
         """
 
 
-@auth_users_views_router.post("/{user_id}/deactivate", response_class=HTMLResponse)
+@auth_users_views_router.post("/{record_id}/deactivate", response_class=HTMLResponse)
 async def deactivate_auth_user_view(
     request: Request,
-    user_id: int,
+    record_id: int,
     auth_context: AuthContext = Depends(verify_admin_auth_token),
 ):
     """Deactivate a user (HTMX endpoint)."""
@@ -326,7 +352,7 @@ async def deactivate_auth_user_view(
         auth_service = get_multi_user_auth_service()
         users = auth_service.list_users(include_inactive=True)
 
-        user = next((u for u in users if u.id == user_id), None)
+        user = next((u for u in users if u.id == record_id), None)
         if not user:
             return """
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -353,7 +379,7 @@ async def deactivate_auth_user_view(
             """
 
     except Exception as e:
-        logger.error(f"Error deactivating user {user_id}: {e}")
+        logger.error(f"Error deactivating user {record_id}: {e}")
         return """
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong>Error!</strong> Failed to deactivate user. Please try again.

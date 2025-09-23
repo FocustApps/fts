@@ -262,7 +262,8 @@ class MultiUserAuthService:
                 if (
                     user.current_token == provided_token
                     and user.token_expires_at
-                    and datetime.now(timezone.utc) < user.token_expires_at
+                    and datetime.now(timezone.utc)
+                    < user.token_expires_at.replace(tzinfo=timezone.utc)
                 ):
 
                     # Update last login time
@@ -294,6 +295,23 @@ class MultiUserAuthService:
                 return session.query(AuthUserTable).filter_by(email=email).first()
         except SQLAlchemyError as e:
             logger.error(f"Database error getting user {email}: {e}")
+            return None
+
+    def get_user_by_id(self, user_id: int) -> Optional[AuthUserTable]:
+        """
+        Get user information by user ID.
+
+        Args:
+            user_id: User's unique ID
+
+        Returns:
+            AuthUserTable instance or None if not found
+        """
+        try:
+            with get_database_session() as session:
+                return session.query(AuthUserTable).filter_by(id=user_id).first()
+        except SQLAlchemyError as e:
+            logger.error(f"Database error getting user ID {user_id}: {e}")
             return None
 
     def list_users(self, include_inactive: bool = False) -> List[AuthUserTable]:

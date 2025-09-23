@@ -34,7 +34,6 @@ services:
       POSTGRES_NAME: fenrir_local
       DATABASE_TYPE: postgres
       PYTHONPATH: /fenrir
-    command: ["sh", "entrypoint.sh"]
     depends_on:
       postgres:
         condition: service_healthy
