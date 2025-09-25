@@ -24,7 +24,7 @@ from app.services.multi_user_auth_service import (
     get_multi_user_auth_service,
     MultiUserAuthError,
 )
-from common.service_connections.db_service.database import AuthUserTable
+from common.service_connections.db_service.auth_user_model import AuthUserModel
 from common.app_logging import create_logging
 from fts.app.routes.template_dataclasses import ViewRecordDataclass
 
@@ -78,8 +78,8 @@ class UserResponse(BaseModel):
     updated_at: Optional[datetime]
 
     @classmethod
-    def from_auth_user(cls, user: AuthUserTable) -> "UserResponse":
-        """Convert AuthUserTable to API response model."""
+    def from_auth_user(cls, user: AuthUserModel) -> "UserResponse":
+        """Convert AuthUserModel to API response model."""
         return cls(
             id=user.id,
             email=user.email,
