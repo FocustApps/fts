@@ -26,7 +26,7 @@ from app.services.multi_user_auth_service import (
 )
 from common.service_connections.db_service.auth_user_model import AuthUserModel
 from common.app_logging import create_logging
-from fts.app.routes.template_dataclasses import ViewRecordDataclass
+from app.routes.template_dataclasses import ViewRecordDataclass
 
 
 class AuthUserDisplay:
@@ -51,7 +51,7 @@ logger = create_logging()
 # Create routers for API and view endpoints
 auth_users_api_router = APIRouter(prefix="/api/auth-users", tags=["auth-users-api"])
 auth_users_views_router = APIRouter(
-    prefix="/auth/users", tags=["auth-users-views"], include_in_schema=False
+    prefix="/auth-users", tags=["auth-users-views"], include_in_schema=False
 )
 
 # Template configuration
@@ -223,6 +223,23 @@ async def view_auth_user(
     except Exception as e:
         logger.error(f"Error viewing auth user {record_id}: {e}")
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@auth_users_views_router.get("/{record_id}/edit", response_class=HTMLResponse)
+async def edit_auth_user(
+    request: Request,
+    record_id: int,
+    auth_context: AuthContext = Depends(verify_admin_auth_token),
+):
+    """Placeholder for editing auth user - currently not implemented."""
+    return templates.TemplateResponse(
+        "error.html",
+        {
+            "request": request,
+            "error_message": "Edit functionality not yet implemented",
+            "error_details": "User editing is not currently available for authentication users.",
+        },
+    )
 
 
 @auth_users_views_router.get("/new/", response_class=HTMLResponse)
