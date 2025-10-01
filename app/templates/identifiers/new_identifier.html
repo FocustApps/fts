@@ -1,0 +1,145 @@
+<div class="container">
+    <button class="btn btn-sm btn-primary" hx-get="{{ url_for(view_url) }}" hx-target="#pageContent"
+        hx-swap="innerHTML">
+        Back to Identifiers
+    </button>
+    {% if page %}
+    <button class="btn btn-sm btn-info" hx-get="/pages/{{ page.id }}" hx-target="#pageContent" hx-swap="innerHTML">
+        Back to Page: {{ page.page_name }}
+    </button>
+    {% endif %}
+
+    <div class="container">
+        <section style="width: 50vw;">
+            <div id="form-messages"></div>
+            <form id="createIdentifierForm" hx-post="/v1/identifiers/new" hx-target="#form-messages"
+                hx-swap="innerHTML">
+                <h3>Add New Identifier</h3>
+
+                <div class="form-group mb-3">
+                    <label for="page_id" class="form-label">Page:</label>
+                    {% if page %}
+                    <input type="hidden" id="page_id" name="page_id" value="{{ page.id }}">
+                    <input type="text" class="form-control" value="{{ page.page_name }} (ID: {{ page.id }})" readonly>
+                    {% else %}
+                    <select id="page_id" name="page_id" class="form-select" required>
+                        <option value="">Select a page...</option>
+                        <!-- Pages will be loaded dynamically -->
+                    </select>
+                    {% endif %}
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="element_name" class="form-label">Element Name:</label>
+                    <input type="text" id="element_name" name="element_name" class="form-control" required
+                        placeholder="login_button" maxlength="96">
+                    <small class="form-text text-muted">Unique name for this element (e.g., login_button,
+                        username_field)</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="locator_strategy" class="form-label">Locator Strategy:</label>
+                    <select id="locator_strategy" name="locator_strategy" class="form-select" required>
+                        <option value="">Select strategy...</option>
+                        <option value="xpath">XPath</option>
+                        <option value="css">CSS Selector</option>
+                        <option value="id">ID</option>
+                        <option value="name">Name</option>
+                        <option value="class_name">Class Name</option>
+                        <option value="tag_name">Tag Name</option>
+                        <option value="link_text">Link Text</option>
+                        <option value="partial_link_text">Partial Link Text</option>
+                    </select>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="locator_query" class="form-label">Locator Query:</label>
+                    <textarea id="locator_query" name="locator_query" class="form-control" required
+                        placeholder="//button[@id='login']" rows="3" maxlength="255"></textarea>
+                    <small class="form-text text-muted">The selector query for finding this element</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="action" class="form-label">Action (optional):</label>
+                    <select id="action" name="action" class="form-select">
+                        <option value="">No specific action</option>
+                        <option value="click">Click</option>
+                        <option value="type">Type/Input</option>
+                        <option value="hover">Hover</option>
+                        <option value="submit">Submit</option>
+                        <option value="select">Select</option>
+                        <option value="scroll">Scroll</option>
+                        <option value="wait">Wait</option>
+                        <option value="verify">Verify</option>
+                    </select>
+                    <small class="form-text text-muted">What action to perform on this element</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label">Environments:</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="dev" id="env_dev" name="environments">
+                        <label class="form-check-label" for="env_dev">Development</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="staging" id="env_staging"
+                            name="environments">
+                        <label class="form-check-label" for="env_staging">Staging</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="prod" id="env_prod" name="environments">
+                        <label class="form-check-label" for="env_prod">Production</label>
+                    </div>
+                    <small class="form-text text-muted">Select environments where this identifier applies</small>
+                </div>
+
+                <br>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Identifier
+                    </button>
+                    <button type="button" class="btn btn-secondary"
+                        hx-get="{% if page %}/pages/{{ page.id }}{% else %}{{ url_for(view_url) }}{% endif %}"
+                        hx-target="#pageContent" hx-swap="innerHTML">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </section>
+        <br>
+    </div>
+</div>
+
+<script>
+    // Reset form after successful submission
+    document.body.addEventListener('htmx:afterSwap', function (evt) {
+        if (evt.detail.target.id === 'form-messages' && evt.detail.xhr.status === 200) {
+            const content = evt.detail.target.innerHTML;
+            if (content.includes('alert-success')) {
+                // Clear the form on success
+                document.getElementById('createIdentifierForm').reset();
+            }
+        }
+    });
+
+    // Load available pages if page_id select exists and no page is pre-selected
+    document.addEventListener('DOMContentLoaded', function () {
+        const pageSelect = document.getElementById('page_id');
+        if (pageSelect && pageSelect.tagName === 'SELECT') {
+            // Load pages via API
+            fetch('/v1/api/pages')
+                .then(response => response.json())
+                .then(data => {
+                    data.data.forEach(page => {
+                        const option = document.createElement('option');
+                        option.value = page.id;
+                        option.textContent = `${page.page_name} (ID: ${page.id})`;
+                        pageSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading pages:', error);
+                });
+        }
+    });
+</script>

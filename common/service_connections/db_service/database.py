@@ -16,6 +16,7 @@ from sqlalchemy.orm import (
     mapped_column,
     declarative_base,
     sessionmaker,
+    relationship,
 )
 
 
@@ -66,12 +67,16 @@ class PageTable(Base):
     page_name: Mapped[str] = mapped_column(sql.String(96), unique=True, nullable=False)
     page_url: Mapped[str] = mapped_column(sql.String(1024), nullable=False)
     environments: Mapped[Dict] = mapped_column(JSONB, nullable=False)
-    identifiers: Mapped[Dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         sql.DateTime, nullable=False, default=datetime.utcnow
     )
     updated_at: Mapped[datetime] = mapped_column(
         sql.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # One-to-many relationship with identifiers
+    identifiers: Mapped[List["IdentifierTable"]] = relationship(
+        "IdentifierTable", back_populates="page", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
@@ -135,6 +140,7 @@ class IdentifierTable(Base):
     element_name: Mapped[str] = mapped_column(sql.String(96), unique=True, nullable=False)
     locator_strategy: Mapped[str] = mapped_column(sql.String(96), nullable=False)
     locator_query: Mapped[str] = mapped_column(sql.String(96), nullable=False)
+    action: Mapped[Optional[str]] = mapped_column(sql.String(96), nullable=True)
     environments: Mapped[List] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(
         sql.DateTime, nullable=False, default=datetime.utcnow
@@ -143,8 +149,11 @@ class IdentifierTable(Base):
         sql.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    # Many-to-one relationship with page
+    page: Mapped["PageTable"] = relationship("PageTable", back_populates="identifiers")
+
     def __repr__(self) -> str:
-        return f"<Identifier(id={self.id}, element='{self.element_name}', page_id={self.page_id})>"
+        return f"<Identifier(id={self.id}, element='{self.element_name}', page_id={self.page_id}, action='{self.action}')>"
 
 
 class EmailProcessorTable(Base):
