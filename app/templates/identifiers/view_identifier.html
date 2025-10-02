@@ -2,9 +2,12 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3>Identifier Details</h3>
         <div>
-            <a href="{{ url_for(view_url) }}" class="btn btn-sm btn-secondary">Back to Identifiers</a>
-            <a href="/pages/{{ identifier.page_id }}" class="btn btn-sm btn-info">View Page</a>
-            <a href="{{ url_for(edit_url, identifier_id=identifier.id) }}" class="btn btn-sm btn-warning">Edit</a>
+            <button class="btn btn-sm btn-secondary" hx-get="{{ url_for('get_identifiers_view') }}"
+                hx-target="#pageContent" hx-swap="innerHTML" type="button">Back to Identifiers</button>
+            <button class="btn btn-sm btn-info" hx-get="{{ url_for('view_page', record_id=identifier.page_id) }}"
+                hx-target="#pageContent" hx-swap="innerHTML" type="button">View Page</button>
+            <button class="btn btn-sm btn-warning" hx-get="{{ url_for(edit_url, record_id=identifier.id) }}"
+                hx-target="#pageContent" hx-swap="innerHTML" type="button">Edit</button>
         </div>
     </div>
 

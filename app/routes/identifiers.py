@@ -22,7 +22,10 @@ from common.service_connections.db_service.identifier_model import (
     update_identifier_by_id,
     drop_identifier_by_id,
 )
-from common.service_connections.db_service.page_model import query_page_by_id
+from common.service_connections.db_service.page_model import (
+    query_all_pages,
+    query_page_by_id,
+)
 from app import TEMPLATE_PATH
 from common.app_logging import create_logging
 
@@ -41,49 +44,27 @@ templates = Jinja2Templates(directory=TEMPLATE_PATH)
 ################ VIEW ROUTES ################
 
 
-@identifiers_views_router.get("/", response_class=HTMLResponse)
+@identifiers_views_router.get(
+    "/", response_class=HTMLResponse, name="get_identifiers_view"
+)
 async def get_identifiers_view(request: Request, token: str = Depends(verify_auth_token)):
     """Display the identifiers management page."""
     try:
-        identifiers = query_all_identifiers(engine=DB_ENGINE, session=Session)
+        identifiers: List[IdentifierModel] = query_all_identifiers(
+            engine=DB_ENGINE, session=Session
+        )
 
-        # Format identifiers for table display
-        identifier_data = []
-        for identifier in identifiers:
-            identifier_display = {
-                "id": identifier.id,
-                "element_name": identifier.element_name,
-                "locator_strategy": identifier.locator_strategy,
-                "locator_query": (
-                    identifier.locator_query[:50] + "..."
-                    if len(identifier.locator_query) > 50
-                    else identifier.locator_query
-                ),
-                "action": identifier.action or "—",
-                "page_id": identifier.page_id,
-                "environments": (
-                    ", ".join(identifier.environments)
-                    if identifier.environments
-                    else "None"
-                ),
-            }
-            identifier_data.append(identifier_display)
+        headers = [
+            key.replace("_", " ").title() for key in identifiers[0].model_dump().keys()
+        ]
 
         return templates.TemplateResponse(
             "table.html",
             {
                 "title": "Identifiers",
                 "request": request,
-                "headers": [
-                    "ID",
-                    "Element Name",
-                    "Strategy",
-                    "Query",
-                    "Action",
-                    "Page ID",
-                    "Environments",
-                ],
-                "table_rows": identifier_data,
+                "headers": headers,
+                "table_rows": identifiers,
                 "view_url": "get_identifiers_view",
                 "view_record_url": "view_identifier",
                 "add_url": "new_identifier_view",
@@ -103,14 +84,16 @@ async def get_identifiers_view(request: Request, token: str = Depends(verify_aut
         )
 
 
-@identifiers_views_router.get("/{identifier_id}", response_class=HTMLResponse)
+@identifiers_views_router.get(
+    "/{record_id}", response_class=HTMLResponse, name="view_identifier"
+)
 async def view_identifier(
-    request: Request, identifier_id: int, token: str = Depends(verify_auth_token)
+    request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
     """Display details for a specific identifier."""
     try:
         identifier = query_identifier_by_id(
-            identifier_id=identifier_id, engine=DB_ENGINE, session=Session
+            identifier_id=record_id, engine=DB_ENGINE, session=Session
         )
 
         # Get the associated page
@@ -139,18 +122,20 @@ async def view_identifier(
                 "identifier": identifier_dict,
                 "page": page,
                 "view_url": "get_identifiers_view",
-                "edit_url": "edit_identifier_view",
+                "edit_url": "edit_identifier",
             },
         )
 
     except ValueError as e:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Error viewing identifier {identifier_id}: {e}")
+        logger.error(f"Error viewing identifier {record_id}: {e}")
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@identifiers_views_router.get("/new/", response_class=HTMLResponse)
+@identifiers_views_router.get(
+    "/new/", response_class=HTMLResponse, name="new_identifier_view"
+)
 async def new_identifier_view(
     request: Request,
     page_id: Optional[int] = None,
@@ -158,23 +143,33 @@ async def new_identifier_view(
 ):
     """Display form for adding a new identifier."""
     page = None
+    pages = []
+
     if page_id:
         try:
             page = query_page_by_id(page_id=page_id, engine=DB_ENGINE, session=Session)
         except ValueError:
-            pass  # Page not found, let user select
+            # Page not found, fall back to generic mode
+            page = None
+            pages = query_all_pages(engine=DB_ENGINE, session=Session)
+    else:
+        # Generic mode - load all pages for selection
+        pages = query_all_pages(engine=DB_ENGINE, session=Session)
 
     return templates.TemplateResponse(
         "identifiers/new_identifier.html",
         {
             "request": request,
             "page": page,
+            "pages": pages,
             "view_url": "get_identifiers_view",
         },
     )
 
 
-@identifiers_views_router.post("/new", response_class=HTMLResponse)
+@identifiers_views_router.post(
+    "/new", response_class=HTMLResponse, name="create_identifier"
+)
 async def create_identifier_view(
     request: Request,
     page_id: int = Form(...),
@@ -237,14 +232,16 @@ async def create_identifier_view(
         """
 
 
-@identifiers_views_router.get("/{identifier_id}/edit", response_class=HTMLResponse)
+@identifiers_views_router.get(
+    "/{record_id}/edit", response_class=HTMLResponse, name="edit_identifier"
+)
 async def edit_identifier_view(
-    request: Request, identifier_id: int, token: str = Depends(verify_auth_token)
+    request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
     """Display form for editing an identifier."""
     try:
         identifier = query_identifier_by_id(
-            identifier_id=identifier_id, engine=DB_ENGINE, session=Session
+            identifier_id=record_id, engine=DB_ENGINE, session=Session
         )
         page = query_page_by_id(
             page_id=identifier.page_id, engine=DB_ENGINE, session=Session
@@ -263,10 +260,12 @@ async def edit_identifier_view(
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@identifiers_views_router.post("/{identifier_id}/edit", response_class=HTMLResponse)
+@identifiers_views_router.post(
+    "/{record_id}/edit", response_class=HTMLResponse, name="update_identifier"
+)
 async def update_identifier_view(
     request: Request,
-    identifier_id: int,
+    record_id: int,
     page_id: int = Form(...),
     element_name: str = Form(...),
     locator_strategy: str = Form(...),
@@ -285,7 +284,7 @@ async def update_identifier_view(
 
         # Create identifier model for update
         identifier_update = IdentifierModel(
-            id=identifier_id,
+            id=record_id,
             page_id=page_id,
             element_name=element_name.strip(),
             locator_strategy=locator_strategy.strip(),
@@ -296,24 +295,24 @@ async def update_identifier_view(
         )
 
         updated_identifier = update_identifier_by_id(
-            identifier_id=identifier_id,
+            identifier_id=record_id,
             identifier_update=identifier_update,
             engine=DB_ENGINE,
             session=Session,
         )
 
-        logger.info(f"Updated identifier: {element_name} (ID: {identifier_id})")
+        logger.info(f"Updated identifier: {element_name} (ID: {record_id})")
 
         return f"""
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <strong>Success!</strong> Identifier updated successfully.
-            <a href="/identifiers/{identifier_id}" class="alert-link">View identifier details</a>
+            <a href="/identifiers/{record_id}" class="alert-link">View identifier details</a>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         """
 
     except ValueError as e:
-        logger.warning(f"Failed to update identifier {identifier_id}: {e}")
+        logger.warning(f"Failed to update identifier {record_id}: {e}")
         return f"""
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong>Error!</strong> {str(e)}
@@ -321,7 +320,7 @@ async def update_identifier_view(
         </div>
         """
     except Exception as e:
-        logger.error(f"Unexpected error updating identifier {identifier_id}: {e}")
+        logger.error(f"Unexpected error updating identifier {record_id}: {e}")
         return """
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong>Error!</strong> Failed to update identifier. Please try again.
@@ -330,23 +329,21 @@ async def update_identifier_view(
         """
 
 
-@identifiers_views_router.post("/{identifier_id}/delete", response_class=HTMLResponse)
+@identifiers_views_router.post(
+    "/{record_id}/delete", response_class=HTMLResponse, name="delete_identifier_view"
+)
 async def delete_identifier_view(
-    request: Request, identifier_id: int, token: str = Depends(verify_auth_token)
+    request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
     """Delete an identifier (HTMX endpoint)."""
     try:
         identifier = query_identifier_by_id(
-            identifier_id=identifier_id, engine=DB_ENGINE, session=Session
+            identifier_id=record_id, engine=DB_ENGINE, session=Session
         )
 
-        drop_identifier_by_id(
-            identifier_id=identifier_id, engine=DB_ENGINE, session=Session
-        )
+        drop_identifier_by_id(identifier_id=record_id, engine=DB_ENGINE, session=Session)
 
-        logger.info(
-            f"Deleted identifier: {identifier.element_name} (ID: {identifier_id})"
-        )
+        logger.info(f"Deleted identifier: {identifier.element_name} (ID: {record_id})")
 
         return f"""
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -363,7 +360,7 @@ async def delete_identifier_view(
         </div>
         """
     except Exception as e:
-        logger.error(f"Error deleting identifier {identifier_id}: {e}")
+        logger.error(f"Error deleting identifier {record_id}: {e}")
         return """
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong>Error!</strong> Failed to delete identifier. Please try again.
@@ -386,18 +383,20 @@ async def list_identifiers_api(token: str = Depends(verify_auth_token)):
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@identifiers_api_router.get("/{identifier_id}", response_model=dict)
-async def get_identifier_api(identifier_id: int, token: str = Depends(verify_auth_token)):
+@identifiers_api_router.get(
+    "/{record_id}", response_model=dict, name="get_identifier_api"
+)
+async def get_identifier_api(record_id: int, token: str = Depends(verify_auth_token)):
     """Get a specific identifier by ID."""
     try:
         identifier = query_identifier_by_id(
-            identifier_id=identifier_id, engine=DB_ENGINE, session=Session
+            identifier_id=record_id, engine=DB_ENGINE, session=Session
         )
         return identifier.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Error getting identifier {identifier_id}: {e}")
+        logger.error(f"Error getting identifier {record_id}: {e}")
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -427,21 +426,23 @@ async def create_identifier_api(
         )
 
 
-@identifiers_api_router.patch("/{identifier_id}", response_model=dict)
+@identifiers_api_router.patch(
+    "/{record_id}", response_model=dict, name="update_identifier_api"
+)
 async def update_identifier_api(
-    identifier_id: int,
+    record_id: int,
     identifier_update: IdentifierModel,
     token: str = Depends(verify_auth_token),
 ):
     """Update an identifier."""
     try:
         updated_identifier = update_identifier_by_id(
-            identifier_id=identifier_id,
+            identifier_id=record_id,
             identifier_update=identifier_update,
             engine=DB_ENGINE,
             session=Session,
         )
-        logger.info(f"Updated identifier via API: {identifier_id}")
+        logger.info(f"Updated identifier via API: {record_id}")
         return updated_identifier.model_dump()
     except ValueError as e:
         logger.warning(f"Failed to update identifier via API: {e}")
@@ -453,29 +454,25 @@ async def update_identifier_api(
         )
 
 
-@identifiers_api_router.delete("/{identifier_id}")
-async def delete_identifier_api(
-    identifier_id: int, token: str = Depends(verify_auth_token)
-):
+@identifiers_api_router.delete("/{record_id}", name="delete_identifier_api")
+async def delete_identifier_api(record_id: int, token: str = Depends(verify_auth_token)):
     """Delete an identifier."""
     try:
         identifier = query_identifier_by_id(
-            identifier_id=identifier_id, engine=DB_ENGINE, session=Session
+            identifier_id=record_id, engine=DB_ENGINE, session=Session
         )
 
-        drop_identifier_by_id(
-            identifier_id=identifier_id, engine=DB_ENGINE, session=Session
-        )
+        drop_identifier_by_id(identifier_id=record_id, engine=DB_ENGINE, session=Session)
 
         logger.info(f"Deleted identifier via API: {identifier.element_name}")
         return {
             "message": "Identifier deleted successfully",
-            "identifier_id": identifier_id,
+            "identifier_id": record_id,
         }
     except ValueError as e:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Error deleting identifier {identifier_id} via API: {e}")
+        logger.error(f"Error deleting identifier {record_id} via API: {e}")
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST, detail="Failed to delete identifier"
         )

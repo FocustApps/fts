@@ -1,7 +1,6 @@
 {% block content %}
-<div class="container" data-page-id="{{ page.id }}" data-page-created-at="{{ page.created_at }}"
-    data-page-identifiers="{{ page.identifiers | tojson | e }}">
-    <button class="btn btn-sm btn-primary" hx-get="{{ url_for(view_url) }}" hx-target="#pageContent"
+<div class="container" data-page-id="{{ page.id }}" data-page-created-at="{{ page.created_at }}">
+    <button class="btn btn-sm btn-primary" hx-get="{{ url_for('get_pages') }}" hx-target="#pageContent"
         hx-swap="innerHTML">
         Back to Pages
     </button>
@@ -84,7 +83,6 @@
                 page_name: formData.get('page_name'),
                 page_url: formData.get('page_url'),
                 created_at: pageCreatedAt,
-                identifiers: pageIdentifiers,
                 environments: environments
             };
 

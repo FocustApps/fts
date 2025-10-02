@@ -1,6 +1,37 @@
 #!/usr/bin/env python3
 """
-Seed admin user script for Fenrir FTS.
+Seed admin user script fo            p            print(f"                # Generate a new    if success:
+        print(
+            "\n🎉 Setup complete! Admin user is ready."
+        )
+        print("💡 Use the token generator script to get authentication tokens:")
+        print("    docker exec fts-fenrir-1 python /fenrir/app/scripts/get_multiuser_token.py")for existing user (but don't send email)
+                try:
+                    token = await auth_service.generate_user_token(
+                        admin_email, send_email=False  # Don't send email - use token generator script instead
+                    )
+                    print(f"💡 User exists. Use the token generator script to get authentication tokens")
+                    return True user created successfully!")
+            print(f"   Email: {user.email}")
+            print(f"   Username: {user.username}")
+            print(f"   Admin: {user.is_admin}")
+            print(f"   ID: {user.id}")
+            print(f"💡 Use the token generator script to get authentication tokens")
+
+            return True               # Generate a new token for existing user and send email
+                try:
+                    token = await auth_service.generate_user_token(
+                        admin_email, send_email=True  # Send email with new token
+                    )
+                    print(f"📧 New authentication token sent to {admin_email}")
+                    return True user created successfully!")
+            print(f"   Email: {user.email}")
+            print(f"   Username: {user.username}")
+            print(f"   Admin: {user.is_admin}")
+            print(f"   ID: {user.id}")
+            print(f"📧 Welcome email with authentication token sent to {user.email}")
+
+            return True FTS.
 
 This script creates an admin user in the database for the email specified
 in the .env file. This is needed after removing the legacy authentication
@@ -47,7 +78,7 @@ async def seed_admin_user():
                 email=admin_email,
                 username=username,
                 is_admin=True,
-                send_welcome_email=True,
+                send_welcome_email=False,  # Don't send welcome email - use token generator script instead
             )
 
             print(f"✅ Admin user created successfully!")
@@ -55,7 +86,7 @@ async def seed_admin_user():
             print(f"   Username: {user.username}")
             print(f"   Admin: {user.is_admin}")
             print(f"   ID: {user.id}")
-            print(f"📧 Welcome email with authentication token sent to {admin_email}")
+            print(f"� Use the token generator script to get authentication tokens")
 
             return True
 
@@ -63,12 +94,12 @@ async def seed_admin_user():
             if "already exists" in str(e):
                 print(f"ℹ️  User {admin_email} already exists in database")
 
-                # Generate a new token for existing user
+                # Generate a new token for existing user (but don't send email)
                 try:
                     token = await auth_service.generate_user_token(
-                        admin_email, send_email=True
+                        admin_email, send_email=False  # Don't send email - use token generator script instead
                     )
-                    print(f"📧 New authentication token sent to {admin_email}")
+                    print(f"� User exists. Use the token generator script to get authentication tokens")
                     return True
                 except Exception as token_error:
                     print(f"❌ Error generating new token: {token_error}")
@@ -91,9 +122,11 @@ async def main():
 
     if success:
         print(
-            "\n🎉 Setup complete! You should receive an email with your authentication token."
+            "\n🎉 Setup complete! Admin user is ready."
         )
-        print("💡 Use the token to log into the FTS application.")
+        print("� Check your email for the authentication token.")
+        print("�💡 You can also use the token generator script if needed:")
+        print("    docker exec fts-fenrir-1 python /fenrir/app/scripts/get_multiuser_token.py")
     else:
         print("\n❌ Setup failed. Please check the errors above.")
         sys.exit(1)

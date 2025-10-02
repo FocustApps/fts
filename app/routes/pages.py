@@ -6,6 +6,7 @@ Selenium will interact with.
 from fastapi import Request, APIRouter, Depends
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from typing import List
 
 from common.service_connections.db_service.db_manager import DB_ENGINE
 from app.dependencies.multi_user_auth_dependency import verify_auth_token
@@ -19,9 +20,6 @@ from common.service_connections.db_service.page_model import (
     update_page_by_id,
 )
 from app import TEMPLATE_PATH
-from app.routes.template_dataclasses import (
-    TableDataclass,
-)
 
 
 page_router = APIRouter(prefix="/pages", tags=["pages"], include_in_schema=False)
@@ -29,42 +27,32 @@ page_router = APIRouter(prefix="/pages", tags=["pages"], include_in_schema=False
 page_templates = Jinja2Templates(TEMPLATE_PATH)
 
 
-@page_router.get("/")
+@page_router.get("/", name="get_pages")
 async def get_pages(request: Request, token: str = Depends(verify_auth_token)):
     # Get all pages with their data
-    pages = query_all_pages(engine=DB_ENGINE, session=Session)
+    pages: List[PageModel] = query_all_pages(engine=DB_ENGINE, session=Session)
 
-    # Format pages for the table display
-    table_rows = []
     for page in pages:
-        table_rows.append(
-            {
-                "id": page.id,
-                "page_name": page.page_name,
-                "page_url": page.page_url,
-                "identifier_count": len(page.identifiers),
-                "environments": (
-                    ", ".join(page.environments) if page.environments else "None"
-                ),
-            }
-        )
+        del page.created_at
+
+    headers = ["ID", "Page Name", "URL", "Identifiers", "Environments"]
 
     return page_templates.TemplateResponse(
         "table.html",
-        TableDataclass(
-            title="Pages",
-            request=request,
-            headers=["ID", "Page Name", "URL", "Identifiers", "Environments"],
-            table_rows=table_rows,
-            view_url="get_pages",
-            view_record_url="view_page",
-            add_url="new_page",
-            delete_url="delete_page",
-        ).model_dump(),
+        {
+            "title": "Pages",
+            "request": request,
+            "headers": headers,
+            "table_rows": pages,
+            "view_url": "get_pages",
+            "view_record_url": "view_page",
+            "add_url": "new_page",
+            "delete_url": "delete_page",
+        },
     )
 
 
-@page_router.get("/new")
+@page_router.get("/new", name="new_page")
 async def new_page(request: Request, token: str = Depends(verify_auth_token)):
     return page_templates.TemplateResponse(
         "/pages/pages_new.html",
@@ -72,7 +60,7 @@ async def new_page(request: Request, token: str = Depends(verify_auth_token)):
     )
 
 
-@page_router.get("/{record_id}")
+@page_router.get("/{record_id}", name="view_page")
 async def view_page(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
@@ -113,16 +101,22 @@ async def view_page(
     )
 
 
-@page_router.get("/{record_id}/edit")
+@page_router.get("/{record_id}/edit", name="edit_page")
 async def edit_page_form(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
     page = query_page_by_id(page_id=record_id, engine=DB_ENGINE, session=Session)
+
+
+    # Create a page dictionary with serializable identifiers
+    page_dict = page.model_dump()
+    page_dict["identifiers"] = [identifier.model_dump() for identifier in page.identifiers]
+
     return page_templates.TemplateResponse(
         "pages/pages_edit.html",
         {
             "request": request,
-            "page": page,
+            "page": page_dict,
             "view_url": "get_pages",
         },
     )
@@ -141,7 +135,7 @@ def edit_page(
     return updated_page
 
 
-@page_router.delete("/{record_id}")
+@page_router.delete("/{record_id}", name="delete_page")
 def delete_page(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):

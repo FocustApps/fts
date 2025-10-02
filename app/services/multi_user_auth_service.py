@@ -10,7 +10,10 @@ from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.auth_service import AuthService, AuthTokenError, logger
-from app.services.email_service import send_user_token_notification, EmailServiceError
+from app.services.email_service import (
+    send_multiuser_token_notification,
+    EmailServiceError,
+)
 from app.services.storage import StorageService, create_storage_service, StorageError
 from app.config import get_base_app_config, get_storage_config
 from common.service_connections.db_service.database import (
@@ -154,7 +157,7 @@ class MultiUserAuthService:
                     initial_token = await self.generate_user_token(
                         email, send_email=False
                     )
-                    send_user_token_notification(
+                    send_multiuser_token_notification(
                         user_email=email,
                         token=initial_token,
                         username=username,
@@ -221,7 +224,7 @@ class MultiUserAuthService:
             # Send email notification if requested
             if send_email:
                 try:
-                    send_user_token_notification(
+                    send_multiuser_token_notification(
                         user_email=email,
                         token=new_token,
                         username=user.username,

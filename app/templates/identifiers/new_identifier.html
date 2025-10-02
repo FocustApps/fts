@@ -12,7 +12,7 @@
     <div class="container">
         <section style="width: 50vw;">
             <div id="form-messages"></div>
-            <form id="createIdentifierForm" hx-post="/v1/identifiers/new" hx-target="#form-messages"
+            <form id="createIdentifierForm" hx-post="{{ url_for('create_identifier') }}" hx-target="#form-messages"
                 hx-swap="innerHTML">
                 <h3>Add New Identifier</h3>
 
@@ -24,7 +24,9 @@
                     {% else %}
                     <select id="page_id" name="page_id" class="form-select" required>
                         <option value="">Select a page...</option>
-                        <!-- Pages will be loaded dynamically -->
+                        {% for p in pages %}
+                        <option value="{{ p.id }}">{{ p.page_name }} (ID: {{ p.id }})</option>
+                        {% endfor %}
                     </select>
                     {% endif %}
                 </div>
@@ -119,27 +121,6 @@
                 // Clear the form on success
                 document.getElementById('createIdentifierForm').reset();
             }
-        }
-    });
-
-    // Load available pages if page_id select exists and no page is pre-selected
-    document.addEventListener('DOMContentLoaded', function () {
-        const pageSelect = document.getElementById('page_id');
-        if (pageSelect && pageSelect.tagName === 'SELECT') {
-            // Load pages via API
-            fetch('/v1/api/pages')
-                .then(response => response.json())
-                .then(data => {
-                    data.data.forEach(page => {
-                        const option = document.createElement('option');
-                        option.value = page.id;
-                        option.textContent = `${page.page_name} (ID: ${page.id})`;
-                        pageSelect.appendChild(option);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error loading pages:', error);
-                });
         }
     });
 </script>

@@ -3,6 +3,7 @@ The users module contains the API and views for users that have
 access to environments.
 """
 
+from typing import List
 from fastapi import Request, APIRouter, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -39,7 +40,7 @@ user_templates = Jinja2Templates(directory=TEMPLATE_PATH)
 
 @user_views_router.get("/", response_class=HTMLResponse)
 async def get_users(request: Request):
-    users = query_all_users(engine=DB_ENGINE, session=Session)
+    users: List[UserModel] = query_all_users(engine=DB_ENGINE, session=Session)
     for user in users:
         del user.created_at
         del user.updated_at

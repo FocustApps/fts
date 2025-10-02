@@ -40,7 +40,7 @@ class PageModel(BaseModel):
     id: Optional[int] = None
     page_name: str
     page_url: str
-    created_at: str
+    created_at: datetime
     identifiers: List[IdentifierModel] = []
     environments: List[str]
 

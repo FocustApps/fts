@@ -97,11 +97,18 @@ async def start_token_rotation_scheduler() -> None:
     try:
         config = get_base_app_config()
 
-        # Always initialize auth service (even without APScheduler)
+        # Initialize auth service with conditional external sync callback
+        # Only use callback if external sync is enabled, otherwise pass None
+        external_callback = (
+            external_sync_placeholder
+            if config.auth_external_sync_enabled or config.email_notification_enabled
+            else None
+        )
+
         auth_service = initialize_auth_service(
             token_file_path=Path(config.auth_token_file_path),
             rotation_interval_minutes=config.auth_rotation_interval_minutes,
-            external_sync_callback=external_sync_placeholder,
+            external_sync_callback=external_callback,
         )
 
         # Generate initial token

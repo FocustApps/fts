@@ -86,6 +86,7 @@ async def root_page(request: Request):
         "Environments": "get_environments",
         "Users": "get_users",
         "Pages": "get_pages",
+        "Identifiers": "get_identifiers_view",
         "Email Processing Items": "get_email_processing_items",
         "Auth Users": "get_auth_users_view",
     }
