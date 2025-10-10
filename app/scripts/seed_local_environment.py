@@ -20,8 +20,18 @@ import sys
 import time
 import logging
 import requests
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+from pathlib import Path
+
+# Add project root to path for selenium controller import
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from common.selenium_controller import get_selenium_controller_methods_documentation
+from app.config import get_config
+from app.services.multi_user_auth_service import get_multi_user_auth_service
 
 # Configure logging
 logging.basicConfig(
@@ -119,16 +129,9 @@ def get_auth_token() -> str:
 
     # Generate a token for the admin user using the multi-user auth service
     try:
-        import asyncio
-        import sys
-        from pathlib import Path
-
         # Add the project root to the path
         project_root = Path("/fenrir")
         sys.path.insert(0, str(project_root))
-
-        from app.config import get_config
-        from app.services.multi_user_auth_service import get_multi_user_auth_service
 
         async def get_admin_token():
             """Generate a token for the admin user."""
@@ -212,6 +215,7 @@ def check_existing_data(client: APIClient) -> Dict[str, bool]:
         "pages": False,
         "identifiers": False,
         "email_processors": False,
+        "actions": False,
     }
 
     try:
@@ -257,6 +261,15 @@ def check_existing_data(client: APIClient) -> Dict[str, bool]:
     except Exception as e:
         logger.debug(f"Could not check identifiers: {e}")
 
+    try:
+        # Check actions
+        action_response = client.get("/v1/api/actions/")
+        if isinstance(action_response, list) and len(action_response) > 0:
+            existing["actions"] = True
+            logger.info(f"Found {len(action_response)} existing actions")
+    except Exception as e:
+        logger.debug(f"Could not check actions: {e}")
+
     return existing
 
 
@@ -274,6 +287,7 @@ def validate_seeding_results(client: APIClient) -> Dict[str, Any]:
         "users": {"count": 0, "success": False},
         "pages": {"count": 0, "success": False},
         "identifiers": {"count": 0, "success": False},
+        "actions": {"count": 0, "success": False},
         "overall_success": False,
     }
 
@@ -316,6 +330,15 @@ def validate_seeding_results(client: APIClient) -> Dict[str, Any]:
             )  # Expected multiple identifiers
             logger.info(f"✓ Identifiers validation: {len(identifier_response)} found")
 
+        # Validate actions
+        action_response = client.get("/v1/api/actions/")
+        if isinstance(action_response, list):
+            results["actions"]["count"] = len(action_response)
+            results["actions"]["success"] = (
+                len(action_response) >= 15
+            )  # Expected selenium controller methods (18+ methods)
+            logger.info(f"✓ Actions validation: {len(action_response)} found")
+
         # Overall success
         results["overall_success"] = all(
             [
@@ -323,6 +346,7 @@ def validate_seeding_results(client: APIClient) -> Dict[str, Any]:
                 results["users"]["success"],
                 results["pages"]["success"],
                 results["identifiers"]["success"],
+                results["actions"]["success"],
             ]
         )
 
@@ -775,6 +799,55 @@ def seed_identifiers(
     return created_identifiers
 
 
+def seed_actions(client: APIClient) -> List[Dict[str, Any]]:
+    """
+    Seed SeleniumController method documentation as actions.
+
+    This function extracts all public methods from the SeleniumController class
+    and creates action records with their documentation for easy reference.
+
+    Returns:
+        List of created action records
+    """
+    logger.info("Seeding actions from SeleniumController documentation...")
+
+    try:
+        # Get selenium controller method documentation
+        selenium_methods = get_selenium_controller_methods_documentation()
+        logger.info(f"Found {len(selenium_methods)} SeleniumController methods to seed")
+
+        created_actions = []
+
+        for method_name, documentation in selenium_methods.items():
+            action_data = {
+                "action_method": method_name,
+                "action_documentation": documentation,
+            }
+
+            try:
+                logger.info(f"Creating action: {method_name}")
+                result = client.post("/v1/api/actions/", action_data)
+                created_actions.append(result)
+                logger.info(
+                    f"✓ Action '{method_name}' created with ID: {result.get('id')}"
+                )
+
+            except SeedingError as e:
+                if "already exists" in str(e).lower():
+                    logger.info(f"Action '{method_name}' already exists, skipping")
+                else:
+                    logger.error(f"Failed to create action '{method_name}': {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error creating action '{method_name}': {e}")
+
+        logger.info(f"Action seeding completed. Created {len(created_actions)} actions.")
+        return created_actions
+
+    except Exception as e:
+        logger.error(f"Failed to seed actions: {e}")
+        return []
+
+
 def main():
     """Main seeding function."""
     logger.info("Starting local environment seeding...")
@@ -847,7 +920,14 @@ def main():
                 "Identifiers already exist or no pages available, skipping identifier seeding"
             )
 
-        # Step 5: Validate seeding results
+        # Step 5: Seed actions (independent of other data)
+        actions = []
+        if not existing_data["actions"]:
+            actions = seed_actions(client)
+        else:
+            logger.info("Actions already exist, skipping action seeding")
+
+        # Step 6: Validate seeding results
         validation_results = validate_seeding_results(client)
 
         if validation_results["overall_success"]:
@@ -856,7 +936,8 @@ def main():
                 f"Created: {validation_results['environments']['count']} environments, "
                 f"{validation_results['users']['count']} users, "
                 f"{validation_results['pages']['count']} pages, "
-                f"{validation_results['identifiers']['count']} identifiers"
+                f"{validation_results['identifiers']['count']} identifiers, "
+                f"{validation_results['actions']['count']} actions"
             )
         else:
             logger.warning("⚠️  Seeding completed with some issues - check logs above")

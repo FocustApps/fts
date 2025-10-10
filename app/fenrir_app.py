@@ -17,6 +17,10 @@ from common.app_logging import create_logging
 
 from app.config import get_base_app_config
 
+from app.routes.auth import get_auth_token_from_cookie
+from app.dependencies.multi_user_auth_dependency import verify_multi_user_auth_token
+from fastapi.responses import RedirectResponse
+
 BASE_CONFIG = get_base_app_config()
 
 logging = create_logging()
@@ -53,9 +57,6 @@ for router in API_ROUTERS:
 
 @app.get("/", response_class=HTMLResponse)
 async def root_page(request: Request):
-    from app.routes.auth import get_auth_token_from_cookie
-    from app.dependencies.multi_user_auth_dependency import verify_multi_user_auth_token
-    from fastapi.responses import RedirectResponse
 
     # Check if user is authenticated via cookie
     auth_token = get_auth_token_from_cookie(request)
@@ -87,6 +88,7 @@ async def root_page(request: Request):
         "Users": "get_users",
         "Pages": "get_pages",
         "Identifiers": "get_identifiers_view",
+        "Actions": "get_actions_view",
         "Email Processing Items": "get_email_processing_items",
         "Auth Users": "get_auth_users_view",
     }

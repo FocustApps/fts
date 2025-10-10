@@ -156,6 +156,25 @@ class IdentifierTable(Base):
         return f"<Identifier(id={self.id}, element='{self.element_name}', page_id={self.page_id}, action='{self.action}')>"
 
 
+class ActionTable(Base):
+    """Action model representing actions to be performed on page elements."""
+
+    __tablename__ = "action"
+
+    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
+    action_method: Mapped[Optional[str]] = mapped_column(sql.String(255))
+    action_documentation: Mapped[Optional[str]] = mapped_column(sql.String(1024))
+    created_at: Mapped[datetime] = mapped_column(
+        sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sql.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    def __repr__(self) -> str:
+        return f"<Action(id={self.id}, method='{self.action_method}', created_at={self.created_at})>"
+
+
 class EmailProcessorTable(Base):
     """Email processor model for handling email automation tasks."""
 
@@ -379,6 +398,7 @@ __all__ = [
     "PageTable",
     "EnvironmentTable",
     "UserTable",
+    "ActionTable",
     "IdentifierTable",
     "EmailProcessorTable",
     "AuthUserTable",
