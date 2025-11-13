@@ -1,6 +1,6 @@
 services:
   postgres:
-    build: 
+    build:
       context: .
       dockerfile: common/service_connections/db_service/Dockerfile
     environment:
@@ -34,7 +34,9 @@ services:
       POSTGRES_NAME: fenrir_local
       DATABASE_TYPE: postgres
       PYTHONPATH: /fenrir
-    command: ["sh", "entrypoint.sh"]
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      AUTH_EXTERNAL_SYNC_ENABLED: false # Disable main AuthService external sync
+      EMAIL_NOTIFICATION_ENABLED: false # Disable main AuthService emails specifically
     depends_on:
       postgres:
         condition: service_healthy

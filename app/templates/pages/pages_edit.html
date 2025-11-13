@@ -1,0 +1,95 @@
+{% block content %}
+<div class="container" data-page-id="{{ page.id }}" data-page-created-at="{{ page.created_at }}">
+    <button class="btn btn-sm btn-primary" hx-get="{{ url_for('get_pages') }}" hx-target="#pageContent"
+        hx-swap="innerHTML">
+        Back to Pages
+    </button>
+    <section style="width: 40vw;">
+        <div id="form-messages"></div>
+        <form id="editPageForm" hx-patch="/v1/api/pages/{{ page.id }}" hx-target="#form-messages" hx-swap="innerHTML">
+            <h3>Edit Page</h3>
+            <div class="form-group mb-3">
+                <label for="page_name" class="form-label">Page Name:</label>
+                <input type="text" id="page_name" name="page_name" class="form-control" required
+                    value="{{ page.page_name }}" placeholder="Enter page name">
+            </div>
+            <div class="form-group mb-3">
+                <label for="page_url" class="form-label">Page URL:</label>
+                <input type="url" id="page_url" name="page_url" class="form-control" required
+                    value="{{ page.page_url }}" placeholder="https://example.com/page">
+            </div>
+            <div class="form-group mb-3">
+                <label for="environments" class="form-label">Environments:</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="dev" id="env_dev" name="environments" {%
+                        if "dev" in page.environments %}checked{% endif %}>
+                    <label class="form-check-label" for="env_dev">Development</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="staging" id="env_staging" name="environments"
+                        {% if "staging" in page.environments %}checked{% endif %}>
+                    <label class="form-check-label" for="env_staging">Staging</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="prod" id="env_prod" name="environments" {%
+                        if "prod" in page.environments %}checked{% endif %}>
+                    <label class="form-check-label" for="env_prod">Production</label>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Update Page</button>
+                <button type="button" class="btn btn-secondary" hx-get="{{ url_for('view_page', record_id=page.id) }}"
+                    hx-target="#pageContent" hx-swap="innerHTML">Cancel</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        // Get page data from HTML data attributes
+        const container = document.querySelector('.container');
+        const pageId = parseInt(container.dataset.pageId);
+        const pageCreatedAt = container.dataset.pageCreatedAt;
+        const pageIdentifiers = JSON.parse(container.dataset.pageIdentifiers || '[]');
+
+        // Handle successful update
+        document.body.addEventListener('htmx:afterSwap', function (evt) {
+            if (evt.detail.target.id === 'form-messages' && evt.detail.xhr.status === 200) {
+                const content = evt.detail.target.innerHTML;
+                if (content.includes('id')) { // Response contains updated page with ID
+                    evt.detail.target.innerHTML =
+                        '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                        '<strong>Success!</strong> Page updated successfully! Redirecting to page view...' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                        '</div>';
+                    setTimeout(function () {
+                        htmx.ajax('GET', '/pages/' + pageId, { target: '#pageContent', swap: 'innerHTML' });
+                    }, 2000);
+                }
+            }
+        });
+
+        // Transform form data to include environments array
+        document.getElementById('editPageForm').addEventListener('htmx:configRequest', function (evt) {
+            const formData = new FormData(evt.detail.elt);
+            const environments = [];
+            formData.getAll('environments').forEach(function (env) {
+                environments.push(env);
+            });
+
+            const data = {
+                id: pageId,
+                page_name: formData.get('page_name'),
+                page_url: formData.get('page_url'),
+                created_at: pageCreatedAt,
+                environments: environments
+            };
+
+            evt.detail.headers['Content-Type'] = 'application/json';
+            evt.detail.parameters = JSON.stringify(data);
+        });
+    });
+</script>
+
+{% endblock %}

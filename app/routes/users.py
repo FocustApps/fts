@@ -3,6 +3,7 @@ The users module contains the API and views for users that have
 access to environments.
 """
 
+from typing import List
 from fastapi import Request, APIRouter, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_base_app_config
 from common.service_connections.db_service.db_manager import DB_ENGINE
-from app.dependencies.auth_dependency import verify_auth_token
+from app.dependencies.multi_user_auth_dependency import verify_auth_token
 
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass
@@ -39,7 +40,7 @@ user_templates = Jinja2Templates(directory=TEMPLATE_PATH)
 
 @user_views_router.get("/", response_class=HTMLResponse)
 async def get_users(request: Request):
-    users = query_all_users(engine=DB_ENGINE, session=Session)
+    users: List[UserModel] = query_all_users(engine=DB_ENGINE, session=Session)
     for user in users:
         del user.created_at
         del user.updated_at

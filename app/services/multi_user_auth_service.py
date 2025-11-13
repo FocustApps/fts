@@ -10,12 +10,25 @@ from typing import Optional, List
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.auth_service import AuthService, AuthTokenError, logger
-from app.services.email_service import send_user_token_notification, EmailServiceError
+from app.services.email_service import (
+    send_multiuser_token_notification,
+    EmailServiceError,
+)
 from app.services.storage import StorageService, create_storage_service, StorageError
 from app.config import get_base_app_config, get_storage_config
 from common.service_connections.db_service.database import (
-    AuthUserTable,
     get_database_session,
+)
+from common.service_connections.db_service.auth_user_model import (
+    AuthUserModel,
+    insert_auth_user,
+    query_auth_user_by_email,
+    query_auth_user_by_id,
+    query_all_auth_users,
+    query_active_auth_users,
+    deactivate_auth_user,
+    update_auth_user_by_id,
+    check_email_exists,
 )
 
 
@@ -64,13 +77,44 @@ class MultiUserAuthService:
 
         logger.info("MultiUserAuthService initialized")
 
+    def _execute_auth_model_function(self, func, *args, **kwargs):
+        """
+        Adapter to execute auth_user_model functions with current session management.
+
+        Converts get_database_session() context manager pattern to
+        session factory + engine pattern expected by auth_user_model functions.
+
+        Args:
+            func: The auth_user_model function to execute
+            *args: Positional arguments for the function
+            **kwargs: Keyword arguments for the function
+
+        Returns:
+            Result from the auth_user_model function
+
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            with get_database_session() as session:
+                # Get the session class and engine from the active session
+                session_class = session.__class__
+                engine = session.bind
+
+                # Call the auth_user_model function with session class and engine
+                return func(*args, session=session_class, engine=engine, **kwargs)
+
+        except Exception as e:
+            logger.error(f"Error executing auth_user_model function {func.__name__}: {e}")
+            raise
+
     async def add_user(
         self,
         email: str,
         username: Optional[str] = None,
         is_admin: bool = False,
         send_welcome_email: bool = True,
-    ) -> AuthUserTable:
+    ) -> AuthUserModel:
         """
         Add a new authenticated user to the system.
 
@@ -81,53 +125,50 @@ class MultiUserAuthService:
             send_welcome_email: Whether to send welcome email with initial token
 
         Returns:
-            Created AuthUserTable instance
+            Created AuthUserModel instance
 
         Raises:
             MultiUserAuthError: If user already exists or creation fails
         """
         try:
-            with get_database_session() as session:
-                # Check if user already exists
-                existing_user = (
-                    session.query(AuthUserTable).filter_by(email=email).first()
-                )
-                if existing_user:
-                    raise MultiUserAuthError(f"User with email {email} already exists")
+            # Check if user already exists
+            if self._execute_auth_model_function(check_email_exists, email=email):
+                raise MultiUserAuthError(f"User with email {email} already exists")
 
-                # Create new user
-                new_user = AuthUserTable(
-                    email=email,
-                    username=username,
-                    is_admin=is_admin,
-                    is_active=True,
-                    created_at=datetime.now(timezone.utc),
-                )
+            # Create new AuthUserModel
+            new_auth_user = AuthUserModel(
+                email=email,
+                username=username,
+                is_admin=is_admin,
+                is_active=True,
+                created_at=datetime.now(timezone.utc),
+            )
 
-                session.add(new_user)
-                session.commit()
-                session.refresh(new_user)
+            # Insert user using auth_user_model function
+            created_user = self._execute_auth_model_function(
+                insert_auth_user, auth_user=new_auth_user
+            )
 
-                logger.info(f"Added new user: {email} (ID: {new_user.id})")
+            logger.info(f"Added new user: {email} (ID: {created_user.id})")
 
-                # Send welcome email with initial token if requested
-                if send_welcome_email:
-                    try:
-                        initial_token = await self.generate_user_token(
-                            email, send_email=False
-                        )
-                        send_user_token_notification(
-                            user_email=email,
-                            token=initial_token,
-                            username=username,
-                            is_new_user=True,
-                        )
-                        logger.info(f"Welcome email sent to new user: {email}")
-                    except EmailServiceError as e:
-                        logger.warning(f"Failed to send welcome email to {email}: {e}")
-                        # Don't fail user creation if email fails
+            # Send welcome email with initial token if requested
+            if send_welcome_email:
+                try:
+                    initial_token = await self.generate_user_token(
+                        email, send_email=False
+                    )
+                    send_multiuser_token_notification(
+                        user_email=email,
+                        token=initial_token,
+                        username=username,
+                        is_new_user=True,
+                    )
+                    logger.info(f"Welcome email sent to new user: {email}")
+                except EmailServiceError as e:
+                    logger.warning(f"Failed to send welcome email to {email}: {e}")
+                    # Don't fail user creation if email fails
 
-                return new_user
+            return created_user
 
         except SQLAlchemyError as e:
             logger.error(f"Database error adding user {email}: {e}")
@@ -148,57 +189,53 @@ class MultiUserAuthService:
             MultiUserAuthError: If user not found or token generation fails
         """
         try:
-            with get_database_session() as session:
-                user = (
-                    session.query(AuthUserTable)
-                    .filter_by(email=email, is_active=True)
-                    .first()
-                )
-                if not user:
-                    raise MultiUserAuthError(f"Active user not found: {email}")
+            # Get user by email
+            user = self._execute_auth_model_function(
+                query_auth_user_by_email, email=email
+            )
+            if not user or not user.is_active:
+                raise MultiUserAuthError(f"Active user not found: {email}")
 
-                # Generate new token
-                new_token = self._base_auth_service.generate_token()
-                expires_at = datetime.now(timezone.utc) + timedelta(
-                    hours=self.token_expiry_hours
-                )
+            # Generate new token
+            new_token = self._base_auth_service.generate_token()
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                hours=self.token_expiry_hours
+            )
 
-                # Update user record
-                user.current_token = new_token
-                user.token_expires_at = expires_at
-                user.updated_at = datetime.now(timezone.utc)
+            # Update user with new token using auth_user_model
+            user.current_token = new_token
+            user.token_expires_at = expires_at
+            user.updated_at = datetime.now(timezone.utc)
 
-                session.commit()
+            self._execute_auth_model_function(
+                update_auth_user_by_id, user_id=user.id, auth_user=user
+            )
 
-                logger.info(f"Generated new token for user: {email}")
+            logger.info(f"Generated new token for user: {email}")
 
-                # Store token in configured storage if available
-                if self._storage_service:
-                    try:
-                        await self._store_token_to_storage(email, new_token, expires_at)
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to store token to storage for {email}: {e}"
-                        )
-                        # Don't fail token generation if storage fails
+            # Store token in configured storage if available
+            if self._storage_service:
+                try:
+                    await self._store_token_to_storage(email, new_token, expires_at)
+                except Exception as e:
+                    logger.warning(f"Failed to store token to storage for {email}: {e}")
+                    # Don't fail token generation if storage fails
 
-                # Send email notification if requested
-                if send_email:
-                    try:
-                        send_user_token_notification(
-                            user_email=email,
-                            token=new_token,
-                            username=user.username,
-                            is_new_user=False,
-                        )
-                        logger.info(f"Token notification email sent to: {email}")
-                    except EmailServiceError as e:
-                        logger.warning(
-                            f"Failed to send token notification to {email}: {e}"
-                        )
-                        # Don't fail token generation if email fails
+            # Send email notification if requested
+            if send_email:
+                try:
+                    send_multiuser_token_notification(
+                        user_email=email,
+                        token=new_token,
+                        username=user.username,
+                        is_new_user=False,
+                    )
+                    logger.info(f"Token notification email sent to: {email}")
+                except EmailServiceError as e:
+                    logger.warning(f"Failed to send token notification to {email}: {e}")
+                    # Don't fail token generation if email fails
 
-                return new_token
+            return new_token
 
         except SQLAlchemyError as e:
             logger.error(f"Database error generating token for {email}: {e}")
@@ -248,38 +285,38 @@ class MultiUserAuthService:
             return False
 
         try:
-            with get_database_session() as session:
-                user = (
-                    session.query(AuthUserTable)
-                    .filter_by(email=email, is_active=True)
-                    .first()
-                )
-                if not user:
-                    logger.debug(f"User not found or inactive: {email}")
-                    return False
-
-                # Check if token matches and is not expired
-                if (
-                    user.current_token == provided_token
-                    and user.token_expires_at
-                    and datetime.now(timezone.utc) < user.token_expires_at
-                ):
-
-                    # Update last login time
-                    user.update_last_login()
-                    session.commit()
-
-                    logger.debug(f"Token validated successfully for user: {email}")
-                    return True
-
-                logger.debug(f"Token validation failed for user: {email}")
+            user = self._execute_auth_model_function(
+                query_auth_user_by_email, email=email
+            )
+            if not user or not user.is_active:
+                logger.debug(f"User not found or inactive: {email}")
                 return False
+
+            # Check if token matches and is not expired
+            if (
+                user.current_token == provided_token
+                and user.token_expires_at
+                and datetime.now(timezone.utc)
+                < user.token_expires_at.replace(tzinfo=timezone.utc)
+            ):
+                # Update last login time
+                user.last_login_at = datetime.now(timezone.utc)
+                user.updated_at = datetime.now(timezone.utc)
+                self._execute_auth_model_function(
+                    update_auth_user_by_id, user_id=user.id, auth_user=user
+                )
+
+                logger.debug(f"Token validated successfully for user: {email}")
+                return True
+
+            logger.debug(f"Token validation failed for user: {email}")
+            return False
 
         except SQLAlchemyError as e:
             logger.error(f"Database error validating token for {email}: {e}")
             return False
 
-    def get_user_by_email(self, email: str) -> Optional[AuthUserTable]:
+    def get_user_by_email(self, email: str) -> Optional[AuthUserModel]:
         """
         Get user information by email address.
 
@@ -287,16 +324,35 @@ class MultiUserAuthService:
             email: User's email address
 
         Returns:
-            AuthUserTable instance or None if not found
+            AuthUserModel instance or None if not found
         """
         try:
-            with get_database_session() as session:
-                return session.query(AuthUserTable).filter_by(email=email).first()
+            return self._execute_auth_model_function(
+                query_auth_user_by_email, email=email
+            )
         except SQLAlchemyError as e:
             logger.error(f"Database error getting user {email}: {e}")
             return None
 
-    def list_users(self, include_inactive: bool = False) -> List[AuthUserTable]:
+    def get_user_by_id(self, user_id: int) -> Optional[AuthUserModel]:
+        """
+        Get user information by user ID.
+
+        Args:
+            user_id: User's unique ID
+
+        Returns:
+            AuthUserModel instance or None if not found
+        """
+        try:
+            return self._execute_auth_model_function(
+                query_auth_user_by_id, user_id=user_id
+            )
+        except (SQLAlchemyError, ValueError) as e:
+            logger.error(f"Database error getting user ID {user_id}: {e}")
+            return None
+
+    def list_users(self, include_inactive: bool = False) -> List[AuthUserModel]:
         """
         List all users in the system.
 
@@ -304,15 +360,13 @@ class MultiUserAuthService:
             include_inactive: Whether to include inactive users
 
         Returns:
-            List of AuthUserTable instances
+            List of AuthUserModel instances
         """
         try:
-            with get_database_session() as session:
-                query = session.query(AuthUserTable)
-                if not include_inactive:
-                    query = query.filter_by(is_active=True)
-
-                return query.all()
+            if include_inactive:
+                return self._execute_auth_model_function(query_all_auth_users)
+            else:
+                return self._execute_auth_model_function(query_active_auth_users)
         except SQLAlchemyError as e:
             logger.error(f"Database error listing users: {e}")
             return []
@@ -328,22 +382,20 @@ class MultiUserAuthService:
             True if user was deactivated, False if not found
         """
         try:
-            with get_database_session() as session:
-                user = session.query(AuthUserTable).filter_by(email=email).first()
-                if not user:
-                    return False
+            # Get user by email first
+            user = self._execute_auth_model_function(
+                query_auth_user_by_email, email=email
+            )
+            if not user:
+                return False
 
-                user.is_active = False
-                user.current_token = None
-                user.token_expires_at = None
-                user.updated_at = datetime.now(timezone.utc)
+            # Deactivate user using auth_user_model function
+            self._execute_auth_model_function(deactivate_auth_user, user_id=user.id)
 
-                session.commit()
+            logger.info(f"Deactivated user: {email}")
+            return True
 
-                logger.info(f"Deactivated user: {email}")
-                return True
-
-        except SQLAlchemyError as e:
+        except (SQLAlchemyError, ValueError) as e:
             logger.error(f"Database error deactivating user {email}: {e}")
             return False
 
@@ -375,29 +427,34 @@ class MultiUserAuthService:
             Number of tokens cleaned
         """
         try:
-            with get_database_session() as session:
-                expired_users = (
-                    session.query(AuthUserTable)
-                    .filter(
-                        AuthUserTable.token_expires_at < datetime.now(timezone.utc),
-                        AuthUserTable.current_token.isnot(None),
-                    )
-                    .all()
-                )
+            # Get all users
+            all_users = self._execute_auth_model_function(query_all_auth_users)
 
-                count = 0
-                for user in expired_users:
+            count = 0
+            current_time = datetime.now(timezone.utc)
+
+            for user in all_users:
+                # Check if user has expired token
+                if (
+                    user.current_token
+                    and user.token_expires_at
+                    and current_time > user.token_expires_at.replace(tzinfo=timezone.utc)
+                ):
+
+                    # Clear expired token
                     user.current_token = None
                     user.token_expires_at = None
-                    user.updated_at = datetime.now(timezone.utc)
+                    user.updated_at = current_time
+
+                    self._execute_auth_model_function(
+                        update_auth_user_by_id, user_id=user.id, auth_user=user
+                    )
                     count += 1
 
-                session.commit()
+            if count > 0:
+                logger.info(f"Cleaned {count} expired tokens")
 
-                if count > 0:
-                    logger.info(f"Cleaned {count} expired tokens")
-
-                return count
+            return count
 
         except SQLAlchemyError as e:
             logger.error(f"Database error cleaning expired tokens: {e}")
@@ -418,35 +475,34 @@ class MultiUserAuthService:
             MultiUserAuthError: If database operation fails
         """
         try:
-            with get_database_session() as session:
-                user = (
-                    session.query(AuthUserTable)
-                    .filter(AuthUserTable.email == email.lower())
-                    .first()
-                )
+            user = self._execute_auth_model_function(
+                query_auth_user_by_email, email=email.lower()
+            )
 
-                if not user:
-                    logger.warning(f"Cannot invalidate token: User {email} not found")
-                    return False
+            if not user:
+                logger.warning(f"Cannot invalidate token: User {email} not found")
+                return False
 
-                if not user.current_token:
-                    logger.debug(f"No active token to invalidate for user {email}")
-                    return False
+            if not user.current_token:
+                logger.debug(f"No active token to invalidate for user {email}")
+                return False
 
-                # Check if the provided token matches the current token
-                if user.current_token != token:
-                    logger.warning(f"Token mismatch during invalidation for user {email}")
-                    return False
+            # Check if the provided token matches the current token
+            if user.current_token != token:
+                logger.warning(f"Token mismatch during invalidation for user {email}")
+                return False
 
-                # Invalidate the token
-                user.current_token = None
-                user.token_expires_at = None
-                user.updated_at = datetime.now(timezone.utc)
+            # Invalidate the token
+            user.current_token = None
+            user.token_expires_at = None
+            user.updated_at = datetime.now(timezone.utc)
 
-                session.commit()
+            self._execute_auth_model_function(
+                update_auth_user_by_id, user_id=user.id, auth_user=user
+            )
 
-                logger.info(f"Token invalidated for user {email}")
-                return True
+            logger.info(f"Token invalidated for user {email}")
+            return True
 
         except SQLAlchemyError as e:
             logger.error(f"Database error invalidating token for {email}: {e}")
@@ -466,26 +522,25 @@ class MultiUserAuthService:
             MultiUserAuthError: If database operation fails
         """
         try:
-            with get_database_session() as session:
-                user = (
-                    session.query(AuthUserTable)
-                    .filter(AuthUserTable.email == email.lower())
-                    .first()
-                )
+            user = self._execute_auth_model_function(
+                query_auth_user_by_email, email=email.lower()
+            )
 
-                if not user:
-                    logger.warning(f"Cannot invalidate tokens: User {email} not found")
-                    return False
+            if not user:
+                logger.warning(f"Cannot invalidate tokens: User {email} not found")
+                return False
 
-                # Clear all token information
-                user.current_token = None
-                user.token_expires_at = None
-                user.updated_at = datetime.now(timezone.utc)
+            # Clear all token information
+            user.current_token = None
+            user.token_expires_at = None
+            user.updated_at = datetime.now(timezone.utc)
 
-                session.commit()
+            self._execute_auth_model_function(
+                update_auth_user_by_id, user_id=user.id, auth_user=user
+            )
 
-                logger.info(f"All tokens invalidated for user {email}")
-                return True
+            logger.info(f"All tokens invalidated for user {email}")
+            return True
 
         except SQLAlchemyError as e:
             logger.error(f"Database error invalidating all tokens for {email}: {e}")

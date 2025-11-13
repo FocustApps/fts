@@ -46,7 +46,7 @@ def insert_user(user: UserModel, session: Session, engine) -> UserModel:
     """
     if user.id:
         user.id = None
-        logging.warning("Environment ID will only be set by the system")
+        logging.warning("User ID will only be set by the system")
     with session(engine) as session:
         user.created_at = datetime.now()
         db_user = UserTable(**user.model_dump())

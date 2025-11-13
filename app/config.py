@@ -7,9 +7,9 @@ from pydantic import BaseModel
 class BaseAppConfig(BaseModel):
     environment: str = "local"
     api_version: str = "v1"
-    htmx_version: str = "2.0.4"
+    htmx_version: str = "2.0.6"
     jquery_version: str = "3.7.1"
-    bootstrap_version: str = "5.3.3"
+    bootstrap_version: str = "5.3.7"
 
     # Authentication settings
     auth_token_file_path: Path = Path("auth_token.txt")

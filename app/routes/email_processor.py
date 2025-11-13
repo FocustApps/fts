@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.db_manager import DB_ENGINE
-from app.dependencies.auth_dependency import verify_auth_token
+from app.dependencies.multi_user_auth_dependency import verify_auth_token
 
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass

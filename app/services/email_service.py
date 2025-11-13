@@ -23,11 +23,13 @@ class EmailServiceError(Exception):
     pass
 
 
-def send_user_token_notification(
+
+def send_multiuser_token_notification(
     user_email: str, token: str, username: Optional[str] = None, is_new_user: bool = False
 ) -> None:
     """
     Send email notification with authentication token to a specific user.
+    This version bypasses the global email_notification_enabled setting for MultiUserAuthService.
 
     Args:
         user_email: Email address of the user receiving the token
@@ -40,9 +42,8 @@ def send_user_token_notification(
     """
     config = get_config()
 
-    if not config.email_notification_enabled:
-        logger.debug("Email notifications disabled, skipping user token notification")
-        return
+    # Skip global email_notification_enabled check for multi-user emails
+    # This allows admin user seeding emails even when main AuthService emails are disabled
 
     if not config.smtp_username or not config.smtp_password:
         logger.warning(
@@ -104,75 +105,14 @@ Automated Token Notification
             server.login(config.smtp_username, config.smtp_password)
             server.sendmail(config.smtp_username, user_email, msg.as_string())
 
-        logger.info(f"User token notification email sent successfully to {user_email}")
+        logger.info(
+            f"MultiUser token notification email sent successfully to {user_email}"
+        )
 
     except Exception as e:
-        logger.error(f"Failed to send user token notification email to {user_email}: {e}")
-        raise EmailServiceError(f"Email sending failed: {e}")
-
-
-def send_admin_user_notification(
-    admin_email: str, user_email: str, action: str, username: Optional[str] = None
-) -> None:
-    """
-    Send admin notification about user management actions.
-
-    Args:
-        admin_email: Email address of the admin to notify
-        user_email: Email address of the user who was affected
-        action: Action that was performed (e.g., "added", "deactivated", "token_generated")
-        username: Optional username of the affected user
-
-    Raises:
-        EmailServiceError: If email sending fails
-    """
-    config = get_config()
-
-    if not config.email_notification_enabled:
-        logger.debug("Email notifications disabled, skipping admin notification")
-        return
-
-    if not config.smtp_username or not config.smtp_password:
-        logger.warning("SMTP credentials not configured, cannot send admin notification")
-        return
-
-    try:
-        # Create message
-        msg = MIMEMultipart()
-        msg["From"] = config.smtp_username
-        msg["To"] = admin_email
-        msg["Subject"] = f"Fenrir Admin Alert - User {action.replace('_', ' ').title()}"
-
-        # Email body
-        body = f"""
-Fenrir Testing System - Admin Notification
-
-A user management action has been performed:
-
-Action: {action.replace('_', ' ').title()}
-User Email: {user_email}
-Username: {username or 'Not specified'}
-Environment: {config.environment}
-Timestamp: {Path(__file__).stat().st_mtime}
-
-This is an automated notification from the Fenrir Testing System.
-
----
-Fenrir Testing System
-Automated Admin Notification
-        """.strip()
-
-        msg.attach(MIMEText(body, "plain"))
-
-        # Use Gmail SMTP_SSL for secure connection (port 465)
-        with smtplib.SMTP_SSL(config.smtp_server, config.smtp_port) as server:
-            server.login(config.smtp_username, config.smtp_password)
-            server.sendmail(config.smtp_username, admin_email, msg.as_string())
-
-        logger.info(f"Admin notification email sent successfully to {admin_email}")
-
-    except Exception as e:
-        logger.error(f"Failed to send admin notification email to {admin_email}: {e}")
+        logger.error(
+            f"Failed to send multiuser token notification email to {user_email}: {e}"
+        )
         raise EmailServiceError(f"Email sending failed: {e}")
 
 
@@ -244,34 +184,3 @@ Automated Token Notification
     except Exception as e:
         logger.error(f"Failed to send token notification email: {e}")
         raise EmailServiceError(f"Email sending failed: {e}")
-
-
-def test_email_configuration() -> bool:
-    """
-    Test the email configuration by attempting to connect to SMTP server.
-    Uses Gmail SMTP_SSL for secure connection testing.
-
-    Returns:
-        True if configuration is valid and connection successful
-    """
-    config = get_config()
-
-    if not config.email_notification_enabled:
-        logger.info("Email notifications disabled")
-        return False
-
-    if not config.smtp_username or not config.smtp_password:
-        logger.warning("SMTP credentials not configured")
-        return False
-
-    try:
-        # Test Gmail SMTP_SSL connection (port 465)
-        with smtplib.SMTP_SSL(config.smtp_server, config.smtp_port) as server:
-            server.login(config.smtp_username, config.smtp_password)
-
-        logger.info("Email configuration test successful")
-        return True
-
-    except Exception as e:
-        logger.error(f"Email configuration test failed: {e}")
-        return False
