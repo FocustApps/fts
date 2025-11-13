@@ -8,7 +8,6 @@ from enum import Enum
 import time
 from typing import Tuple
 
-
 from selenium.common.exceptions import (
     StaleElementReferenceException,
     NoSuchElementException,
@@ -22,7 +21,6 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
-import inspect
 
 
 class MaxElementRetriesException(Exception):
@@ -540,33 +538,3 @@ class SeleniumController:
                 f"Element with selector '{value}' did not disappear within {timeout} seconds."
             )
             return False
-
-
-def get_selenium_controller_methods_documentation() -> dict[str, str]:
-    """
-    Builds a dictionary of all SeleniumController methods as keys and their docstrings as values.
-
-    Returns:
-        dict[str, str]: Dictionary mapping method names to their docstrings.
-    """
-
-    methods_doc = {}
-
-    # Get all methods from the SeleniumController class
-    for name, method in inspect.getmembers(
-        SeleniumController, predicate=inspect.isfunction
-    ):
-        # Skip private methods (those starting with underscore)
-        if not name.startswith("_"):
-            docstring = inspect.getdoc(method)
-            if docstring:
-                methods_doc[name] = docstring
-            else:
-                methods_doc[name] = "No documentation available"
-
-    return methods_doc
-
-
-# Check if all the methods in the FrontendDriver class are in the FrontendActionsEnum
-if __name__ == "__main__":
-    print(get_selenium_controller_methods_documentation())

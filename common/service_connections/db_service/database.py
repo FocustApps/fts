@@ -20,6 +20,14 @@ from sqlalchemy.orm import (
 )
 
 
+from datetime import datetime
+from typing import Dict, List, Optional
+import sqlalchemy as sql
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session, sessionmaker
+from sqlalchemy.dialects.postgresql import JSONB
+
+
 # Single declarative base for all models
 Base = declarative_base()
 
@@ -37,14 +45,6 @@ class SystemEnum(StrEnum):
     @staticmethod
     def is_valid_system(system: str):
         return system in SystemEnum.get_valid_systems()
-
-
-from datetime import datetime
-from typing import Dict, List, Optional
-import sqlalchemy as sql
-from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session, sessionmaker
-from sqlalchemy.dialects.postgresql import JSONB
 
 
 class Base(DeclarativeBase):
@@ -68,10 +68,13 @@ class PageTable(Base):
     page_url: Mapped[str] = mapped_column(sql.String(1024), nullable=False)
     environments: Mapped[Dict] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow
+        sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        sql.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # One-to-many relationship with identifiers
@@ -96,7 +99,7 @@ class EnvironmentTable(Base):
     status: Mapped[str] = mapped_column(sql.String(96), nullable=False)
     users: Mapped[List] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow
+        sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
 
@@ -143,10 +146,13 @@ class IdentifierTable(Base):
     action: Mapped[Optional[str]] = mapped_column(sql.String(96), nullable=True)
     environments: Mapped[List] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow
+        sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        sql.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # Many-to-one relationship with page
@@ -163,12 +169,16 @@ class ActionTable(Base):
 
     id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
     action_method: Mapped[Optional[str]] = mapped_column(sql.String(255))
+    action_parameters: Mapped[Optional[Dict]] = mapped_column(JSONB)
     action_documentation: Mapped[Optional[str]] = mapped_column(sql.String(1024))
     created_at: Mapped[datetime] = mapped_column(
         sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        sql.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     def __repr__(self) -> str:
@@ -189,7 +199,7 @@ class EmailProcessorTable(Base):
     test_name: Mapped[Optional[str]] = mapped_column(sql.String(255))
     requires_processing: Mapped[bool] = mapped_column(sql.Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow
+        sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
     last_processed_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
@@ -211,7 +221,7 @@ class AuthUserTable(Base):
     is_active: Mapped[bool] = mapped_column(sql.Boolean, default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(sql.Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        sql.DateTime, nullable=False, default=datetime.utcnow
+        sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     last_login_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
     updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)

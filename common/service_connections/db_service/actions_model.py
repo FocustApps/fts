@@ -20,12 +20,16 @@ class ActionModel(BaseModel):
 
     Fields:
     - id (int): The unique identifier for the action.
-    - value (Optional[str]): Value of action from the selenium controller.
+    - action_method (str): The method name of the action (e.g., "click", "input_text").
+    - action_parameters (dict): A dictionary of parameters required for the action (e.g.,
+        text to input, index to select).
+    - action_documentation (str): A description of what the action does.
     - created_at (datetime): The timestamp when the action was created.
     """
 
     id: Optional[int] = None
     action_method: Optional[str] = None
+    action_parameters: Optional[dict] = None
     action_documentation: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
