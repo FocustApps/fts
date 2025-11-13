@@ -3,7 +3,7 @@ name = "fenrir"
 version = "0.1.0"
 description = "test system for focustapps"
 authors = [{ name = "FocustAppsLLC" }]
-requires-python = "~=3.12"
+requires-python = ">=3.12, <4"
 readme = "README.md"
 license = "MIT"
 dependencies = [
@@ -43,6 +43,7 @@ dependencies = [
     "pytest-asyncio>=1.1.0",
     "email-validator>=2.3.0",
     "aiofiles>=24.1.0,<25",
+    "apscheduler>=3.11.0",
 ]
 
 [dependency-groups]
@@ -65,15 +66,15 @@ target-version = ['py312']
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-log_cli = true
+log_cli = "true"
 addopts = "--strict-markers"
 markers = [
-    "release: mark a test that will be ran for a release",
-    "manual_only: mark a test that is will only be manually tested",
-    "planned: mark a test that is not yet automated but is planned to be.",
-    "covered_by_unit: mark a test that is covered by a unit test",
-    "requires_data: tests that require data from email processing.",
-    "asyncio: mark a test as an async test",
+    "release",
+    "manual_only",
+    "planned",
+    "covered_by_unit",
+    "requires_data",
+    "asyncio",
 ]
 
 [tool.pylint]
