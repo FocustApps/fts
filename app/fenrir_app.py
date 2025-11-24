@@ -55,6 +55,15 @@ for router in API_ROUTERS:
         app.include_router(prefix=f"/{BASE_CONFIG.api_version}", router=router)
 
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for load balancers and monitoring.
+    Returns basic application status.
+    """
+    return {"status": "healthy", "application": "fenrir", "version": "0.1"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root_page(request: Request):
 
