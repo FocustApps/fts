@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import TEMPLATE_PATH
 from app.routes import API_ROUTERS
@@ -36,6 +37,23 @@ app = FastAPI(
     version="0.1",
     lifespan=auth_scheduler_lifespan,
 )
+
+
+# Middleware to handle proxy headers from Caddy
+class ProxyHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Trust X-Forwarded-* headers from Caddy for proper URL generation
+        if "x-forwarded-proto" in request.headers:
+            request.scope["scheme"] = request.headers["x-forwarded-proto"]
+        if "x-forwarded-host" in request.headers:
+            request.scope["server"] = (
+                request.headers["x-forwarded-host"],
+                443 if request.scope.get("scheme") == "https" else 80,
+            )
+        return await call_next(request)
+
+
+app.add_middleware(ProxyHeadersMiddleware)
 
 app.mount(
     path="/public",
