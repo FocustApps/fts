@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 # Import centralized database components
-from .database import IdentifierTable
+from common.service_connections.db_service.database import IdentifierTable
 
 
 class IdentifierModel(BaseModel):

@@ -14,7 +14,7 @@ from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from common.service_connections.db_service.db_manager import DB_ENGINE
 from app.dependencies.multi_user_auth_dependency import verify_auth_token
-from common.service_connections.db_service.identifier_model import (
+from common.service_connections.db_service.models.identifier_model import (
     IdentifierModel,
     query_all_identifiers,
     query_identifier_by_id,
@@ -22,7 +22,7 @@ from common.service_connections.db_service.identifier_model import (
     update_identifier_by_id,
     drop_identifier_by_id,
 )
-from common.service_connections.db_service.page_model import (
+from common.service_connections.db_service.models.page_model import (
     query_all_pages,
     query_page_by_id,
 )

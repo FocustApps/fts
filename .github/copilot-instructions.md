@@ -14,6 +14,19 @@ Fenrir is a **multi-application test automation hub** with a **service-oriented 
 
 ## Critical Development Patterns
 
+### Import Rules
+**NEVER use relative imports** in this codebase. Always use absolute imports starting from the package root:
+```python
+# ✅ CORRECT - Absolute imports
+from common.service_connections.db_service.database import Base, PageTable
+from common.service_connections.db_service.database.tables.page import PageTable
+from app.config import get_config
+
+# ❌ WRONG - Relative imports (will fail in Docker)
+from .database import Base
+from ..base import Base
+```
+
 ### Page Object Model Architecture
 Fenrir uses a **structured page object pattern** with inheritance and dataclass locators:
 ```python

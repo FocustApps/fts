@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from service_connections.db_service.db_manager import DB_ENGINE
 from common.config import EmailServiceConfig, get_email_service_config
-from common.service_connections.db_service.email_processor_model import (
+from common.service_connections.db_service.models.email_processor_model import (
     SystemEnum,
     EmailProcessorModel,
     update_email_item_by_id,

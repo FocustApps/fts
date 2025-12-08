@@ -24,7 +24,7 @@ from app.services.multi_user_auth_service import (
     get_multi_user_auth_service,
     MultiUserAuthError,
 )
-from common.service_connections.db_service.auth_user_model import AuthUserModel
+from common.service_connections.db_service.models.auth_user_model import AuthUserModel
 from common.app_logging import create_logging
 from app.routes.template_dataclasses import ViewRecordDataclass
 

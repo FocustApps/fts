@@ -19,7 +19,7 @@ from app.config import get_base_app_config, get_storage_config
 from common.service_connections.db_service.database import (
     get_database_session,
 )
-from common.service_connections.db_service.auth_user_model import (
+from common.service_connections.db_service.models.auth_user_model import (
     AuthUserModel,
     insert_auth_user,
     query_auth_user_by_email,

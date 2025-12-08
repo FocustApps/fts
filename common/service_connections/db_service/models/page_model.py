@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from common.fenrir_enums import EnvironmentEnum
 from common.service_connections.db_service.database import PageTable, IdentifierTable
-from common.service_connections.db_service.identifier_model import IdentifierModel
+from common.service_connections.db_service.models.identifier_model import IdentifierModel
 
 
 # Use the centralized PageTable from database.py
