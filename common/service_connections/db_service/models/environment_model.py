@@ -93,7 +93,7 @@ def query_environment_by_id(
                 env.users = [
                     UserModel(
                         **session.query(SystemUnderTestUserTable)
-                        .filter(SystemUnderTestUserTable.id == user[0])
+                        .filter(SystemUnderTestUserTable.sut_user_id == user[0])
                         .first()
                         .__dict__
                     )

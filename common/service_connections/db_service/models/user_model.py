@@ -79,7 +79,7 @@ def query_user_by_id(user_id: int, session: Session, engine) -> UserModel:
     with session(engine) as session:
         user = (
             session.query(SystemUnderTestUserTable)
-            .filter(SystemUnderTestUserTable.id == user_id)
+            .filter(SystemUnderTestUserTable.sut_user_id == user_id)
             .first()
         )
     if not user:
