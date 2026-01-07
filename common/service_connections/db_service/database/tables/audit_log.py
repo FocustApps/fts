@@ -60,7 +60,7 @@ class AuditLogTable(Base):
     action: Mapped[str] = mapped_column(sql.String(64), nullable=False)
     performed_by_user_id: Mapped[Optional[str]] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
+        sql.ForeignKey("auth_users.id", ondelete="SET NULL"),
         nullable=True,
     )
     account_id: Mapped[Optional[str]] = mapped_column(

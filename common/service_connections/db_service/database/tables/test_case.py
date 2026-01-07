@@ -68,7 +68,7 @@ class TestCaseTable(Base):
     )
     owner_user_id: Mapped[str] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.auth_user_id", ondelete="RESTRICT"),
+        sql.ForeignKey("auth_users.id", ondelete="RESTRICT"),
         nullable=False,
     )
     account_id: Mapped[str] = mapped_column(
@@ -82,7 +82,7 @@ class TestCaseTable(Base):
     )
     deactivated_by_user_id: Mapped[Optional[str]] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
+        sql.ForeignKey("auth_users.id", ondelete="SET NULL"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

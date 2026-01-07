@@ -18,7 +18,9 @@ import pytest
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from common.service_connections.db_service.database.tables.account_tables.account import AccountTable
+from common.service_connections.db_service.database.tables.account_tables.account import (
+    AccountTable,
+)
 from common.service_connections.db_service.database.tables.action_chain import (
     ActionChainTable,
 )
@@ -132,7 +134,6 @@ def system_under_test_factory(engine: Engine, session: Session, account_factory)
     def _create_sut(
         account_id: str,
         name: Optional[str] = None,
-        system_type: str = "web_application",
         owner_user_id: Optional[str] = None,
     ) -> str:
         """Create SystemUnderTest with synthetic data."""
@@ -142,7 +143,6 @@ def system_under_test_factory(engine: Engine, session: Session, account_factory)
             sut = SystemUnderTestTable(
                 sut_id=str(uuid4()),
                 system_name=name or f"Test System {counter:03d}",
-                system_type=system_type,
                 account_id=account_id,
                 owner_user_id=owner_user_id,
                 is_active=True,
@@ -165,7 +165,9 @@ def system_under_test_factory(engine: Engine, session: Session, account_factory)
 
 
 @pytest.fixture(scope="function")
-def test_case_factory(engine: Engine, session: Session, system_under_test_factory, account_factory):
+def test_case_factory(
+    engine: Engine, session: Session, system_under_test_factory, account_factory
+):
     """Factory fixture for creating TestCase records.
 
     Usage:
@@ -393,7 +395,9 @@ def plan_suite_association_factory(engine: Engine, session: Session):
 
 
 @pytest.fixture(scope="function")
-def action_chain_factory(engine: Engine, session: Session, account_factory, system_under_test_factory):
+def action_chain_factory(
+    engine: Engine, session: Session, account_factory, system_under_test_factory
+):
     """Factory fixture for creating ActionChain records with JSONB steps.
 
     Yields:

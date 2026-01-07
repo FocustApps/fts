@@ -73,17 +73,12 @@ class SystemUnderTestTable(Base):
     )
     owner_user_id: Mapped[str] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.auth_user_id", ondelete="RESTRICT"),
+        sql.ForeignKey("auth_users.id", ondelete="RESTRICT"),
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(sql.Boolean, nullable=False, default=True)
     deactivated_at: Mapped[Optional[datetime]] = mapped_column(
         sql.DateTime, nullable=True
-    )
-    deactivated_by_user_id: Mapped[Optional[str]] = mapped_column(
-        sql.String(36),
-        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
-        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
