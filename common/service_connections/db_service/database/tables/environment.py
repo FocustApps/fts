@@ -3,13 +3,18 @@ Environment table model for deployment environments.
 """
 
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import sqlalchemy as sql
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
 from common.service_connections.db_service.database.base import Base
+
+if TYPE_CHECKING:
+    from common.service_connections.db_service.database.tables.system_under_test import (
+        SystemUnderTestTable,
+    )
 
 
 class EnvironmentTable(Base):
@@ -69,6 +74,13 @@ class EnvironmentTable(Base):
         sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime, nullable=True)
+
+    # Relationships
+    systems: Mapped[List["SystemUnderTestTable"]] = relationship(
+        "SystemUnderTestTable",
+        secondary="system_environment_association",
+        back_populates="environments",
+    )
 
     __table_args__ = (
         sql.Index("idx_environment_pk", "environment_id", postgresql_using="btree"),

@@ -14,7 +14,6 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
-from common.service_connections.db_service.database import session
 from common.service_connections.db_service.database.tables.plan import PlanTable
 from common.service_connections.db_service.database.tables.plan_suite_association import (
     PlanSuiteAssociation,
@@ -64,6 +63,7 @@ def add_suite_to_plan(
     suite_id: str,
     execution_order: int,
     engine: Engine,
+    session: Session,
     is_enabled: bool = True,
 ) -> str:
     """Add a suite to a plan with specified execution order.
@@ -90,7 +90,7 @@ def add_suite_to_plan(
         is_active=is_enabled,
     )
 
-    with session(engine) as db_session:
+    with session() as db_session:
         # Verify plan exists
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
@@ -111,7 +111,11 @@ def add_suite_to_plan(
 
 
 def remove_suite_from_plan(
-    plan_id: str, suite_id: str, engine: Engine, soft_delete: bool = True
+    plan_id: str,
+    suite_id: str,
+    engine: Engine,
+    session: Session,
+    soft_delete: bool = True,
 ) -> bool:
     """Remove a suite from a plan.
 
@@ -127,7 +131,7 @@ def remove_suite_from_plan(
     Raises:
         SQLAlchemyError: If database operation fails
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         assoc = (
             db_session.query(PlanSuiteAssociation)
             .filter(
@@ -152,7 +156,7 @@ def remove_suite_from_plan(
 
 
 def reorder_plan_suites(
-    plan_id: str, ordered_suite_ids: List[str], engine: Engine
+    plan_id: str, ordered_suite_ids: List[str], engine: Engine, session: Session
 ) -> int:
     """Reorder suites in a plan by updating execution_order.
 
@@ -168,7 +172,7 @@ def reorder_plan_suites(
         ValueError: If suite IDs don't match existing associations
         SQLAlchemyError: If database operation fails
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         # Get all active associations for plan
         assocs = (
             db_session.query(PlanSuiteAssociation)
@@ -202,7 +206,11 @@ def reorder_plan_suites(
 
 
 def update_suite_execution_order(
-    plan_id: str, suite_id: str, new_execution_order: int, engine: Engine
+    plan_id: str,
+    suite_id: str,
+    new_execution_order: int,
+    engine: Engine,
+    session: Session,
 ) -> bool:
     """Update execution order for a single suite in a plan.
 
@@ -222,7 +230,7 @@ def update_suite_execution_order(
     if new_execution_order < 0:
         raise ValueError(f"execution_order must be >= 0, got {new_execution_order}")
 
-    with session(engine) as db_session:
+    with session() as db_session:
         assoc = (
             db_session.query(PlanSuiteAssociation)
             .filter(
@@ -261,7 +269,7 @@ def query_plan_with_suites(
     Returns:
         PlanWithSuitesModel with populated suites list, or None if plan not found
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         # Get plan
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
@@ -324,7 +332,7 @@ def query_suites_for_plan(
     Returns:
         List of suite_id strings in execution order
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         query = (
             db_session.query(PlanSuiteAssociation.suite_id)
             .filter(PlanSuiteAssociation.plan_id == plan_id)
@@ -352,7 +360,7 @@ def query_plans_for_suite(
     Returns:
         List of plan_id strings
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         query = db_session.query(PlanSuiteAssociation.plan_id).filter(
             PlanSuiteAssociation.suite_id == suite_id
         )
@@ -378,7 +386,7 @@ def get_plan_suite_count(
     Returns:
         Number of suites in plan
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         query = db_session.query(func.count(PlanSuiteAssociation.association_id)).filter(
             PlanSuiteAssociation.plan_id == plan_id
         )
@@ -395,7 +403,11 @@ def get_plan_suite_count(
 
 
 def bulk_add_suites_to_plan(
-    plan_id: str, suite_ids: List[str], engine: Engine, starting_order: int = 0
+    plan_id: str,
+    suite_ids: List[str],
+    engine: Engine,
+    session: Session,
+    starting_order: int = 0,
 ) -> List[str]:
     """Add multiple suites to a plan in a single transaction.
 
@@ -414,7 +426,7 @@ def bulk_add_suites_to_plan(
     """
     assoc_ids = []
 
-    with session(engine) as db_session:
+    with session() as db_session:
         # Verify plan exists
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
@@ -441,7 +453,11 @@ def bulk_add_suites_to_plan(
 
 
 def replace_plan_suites(
-    plan_id: str, new_suite_ids: List[str], engine: Engine, soft_delete_old: bool = True
+    plan_id: str,
+    new_suite_ids: List[str],
+    engine: Engine,
+    session: Session,
+    soft_delete_old: bool = True,
 ) -> Dict[str, List[str]]:
     """Replace all suites in a plan.
 
@@ -460,7 +476,7 @@ def replace_plan_suites(
     """
     result = {"removed": [], "added": []}
 
-    with session(engine) as db_session:
+    with session() as db_session:
         # Verify plan exists
         plan = db_session.get(PlanTable, plan_id)
         if not plan:

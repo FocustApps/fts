@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
-from common.service_connections.db_service.database import session
+
 from common.service_connections.db_service.database.tables.audit_log import (
     AuditLogTable,
 )
@@ -178,7 +178,7 @@ class AuditLogModel(BaseModel):
 # ============================================================================
 
 
-def insert_audit_log(model: AuditLogModel, engine: Engine) -> str:
+def insert_audit_log(model: AuditLogModel, engine: Engine, session: Session) -> str:
     """Insert new audit log record.
 
     This is the ONLY write operation for audit logs. No update or delete allowed.
@@ -186,7 +186,7 @@ def insert_audit_log(model: AuditLogModel, engine: Engine) -> str:
     Args:
         model: AuditLogModel with audit data
         engine: Database engine
-
+        session: Active database session
     Returns:
         audit_id of inserted record
 
@@ -200,20 +200,22 @@ def insert_audit_log(model: AuditLogModel, engine: Engine) -> str:
 
     audit_dict = model.model_dump(exclude_unset=True)
 
-    with session(engine) as db_session:
+    with session() as db_session:
         new_audit = AuditLogTable(**audit_dict)
         db_session.add(new_audit)
         db_session.commit()
         return new_audit.audit_id
 
 
-def bulk_insert_audit_logs(models: List[AuditLogModel], engine: Engine) -> List[str]:
+def bulk_insert_audit_logs(
+    models: List[AuditLogModel], engine: Engine, session: Session
+) -> List[str]:
     """Bulk insert multiple audit log records in a single transaction.
 
     Args:
         models: List of AuditLogModel instances
         engine: Database engine
-
+        session: Active database session
     Returns:
         List of audit_ids for inserted records
 
@@ -224,7 +226,7 @@ def bulk_insert_audit_logs(models: List[AuditLogModel], engine: Engine) -> List[
     audit_ids = []
     current_time = datetime.now(timezone.utc)
 
-    with session(engine) as db_session:
+    with session() as db_session:
         for model in models:
             # Set timestamp if not provided
             if model.timestamp is None:
@@ -257,7 +259,7 @@ def query_audit_log_by_id(
     Returns:
         AuditLogModel if found, None otherwise
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         audit = db_session.get(AuditLogTable, audit_id)
         if audit:
             return AuditLogModel(**audit.__dict__)
@@ -279,7 +281,7 @@ def query_audit_logs_by_entity(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         audits = (
             db_session.query(AuditLogTable)
             .filter(
@@ -316,7 +318,7 @@ def query_audit_logs_by_account(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         filters = [AuditLogTable.account_id == account_id]
 
         if start_date:
@@ -356,7 +358,7 @@ def query_audit_logs_by_user(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         filters = [AuditLogTable.performed_by_user_id == user_id]
 
         if start_date:
@@ -396,7 +398,7 @@ def query_sensitive_audit_logs(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         filters = [AuditLogTable.is_sensitive == True]
 
         if account_id:
@@ -439,7 +441,7 @@ def query_audit_logs_by_action(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         filters = [AuditLogTable.action == action]
 
         if entity_type:
@@ -477,7 +479,7 @@ def get_audit_log_count(
     Returns:
         Count of matching audit log records
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         filters = []
 
         if account_id:

@@ -3,12 +3,17 @@ User table model for test users.
 """
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import sqlalchemy as sql
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from common.service_connections.db_service.database.base import Base
+
+if TYPE_CHECKING:
+    from common.service_connections.db_service.database.tables.system_under_test import (
+        SystemUnderTestTable,
+    )
 
 
 class SystemUnderTestUserTable(Base):
@@ -77,6 +82,12 @@ class SystemUnderTestUserTable(Base):
         sql.DateTime, nullable=False, default=datetime.now(timezone.utc)
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
+
+    # Relationships
+    system: Mapped["SystemUnderTestTable"] = relationship(
+        "SystemUnderTestTable",
+        back_populates="users",
+    )
 
     __table_args__ = (
         sql.Index("idx_sut_user_pk", "sut_user_id"),

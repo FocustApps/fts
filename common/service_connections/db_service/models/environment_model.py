@@ -53,7 +53,7 @@ def insert_environment(
         logging.error("Environment ID will only be set by the system")
     if not environment.users:
         environment.users = []
-    with session(engine) as session:
+    with session() as session:
         environment.created_at = datetime.now()
         db_environment = EnvironmentTable(**environment.model_dump())
         session.add(db_environment)
@@ -68,7 +68,7 @@ def query_environment_by_name(
     """
     Retrieves an environment from the database by name
     """
-    with session(engine) as session:
+    with session() as session:
         return (
             session.query(EnvironmentTable).filter(EnvironmentTable.name == name).first()
         )
@@ -80,7 +80,7 @@ def query_environment_by_id(
     """
     Retrieves an environment from the database by id
     """
-    with session(engine) as session:
+    with session() as session:
         env = (
             session.query(EnvironmentTable)
             .filter(EnvironmentTable.id == environment_id)
@@ -108,7 +108,7 @@ def query_all_environments(session: Session, engine) -> List[EnvironmentModel]:
     """
     Retrieves all environments from the database
     """
-    with session(engine) as session:
+    with session() as session:
         envs = session.query(EnvironmentTable).all()
         return [EnvironmentModel(**env.__dict__) for env in envs if env.status]
 
@@ -122,7 +122,7 @@ def update_environment_by_id(
     """
     Updates an environment in the database
     """
-    with session(engine) as session:
+    with session() as session:
         db_environment = session.get(EnvironmentTable, environment_id)
         if not db_environment:
             raise ValueError(f"Environment ID {environment_id} not found.")
@@ -144,7 +144,7 @@ def drop_environment_by_id(environment_id: int, session: Session, engine: Engine
     """
     Deletes an environment in the database
     """
-    with session(engine) as session:
+    with session() as session:
         environment = session.get(EnvironmentTable, environment_id)
         session.delete(environment)
         session.commit()
@@ -169,7 +169,7 @@ def deactivate_environment_by_id(
     Raises:
         ValueError: If environment not found
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         environment = db_session.get(EnvironmentTable, environment_id)
         if not environment:
             raise ValueError(f"Environment ID {environment_id} not found.")
@@ -205,7 +205,7 @@ def query_active_environments_by_account(
 
     TODO: Verify EnvironmentTable schema has account_id or proper relationship
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         # NOTE: This query assumes EnvironmentTable has account_id field
         # If not present, this will need to join through SystemUnderTestTable
         # or other linking table to filter by account
@@ -240,7 +240,7 @@ def query_environment_systems(
 
     TODO: Verify actual relationship between Environment and SystemUnderTest tables
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         # Verify environment exists
         environment = db_session.get(EnvironmentTable, environment_id)
         if not environment:

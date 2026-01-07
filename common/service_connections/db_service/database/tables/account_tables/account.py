@@ -3,15 +3,18 @@ Account table model for managing accounts.
 """
 
 from datetime import datetime, timezone
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 import sqlalchemy as sql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from common.service_connections.db_service.database.base import Base
 
 if TYPE_CHECKING:
     from common.service_connections.db_service.database.tables.account_tables.auth_user import (
         AuthUserTable,
+    )
+    from common.service_connections.db_service.database.tables.account_tables.auth_user_account_association import (
+        AuthUserAccountAssociation,
     )
 
 
@@ -64,11 +67,13 @@ class AccountTable(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime, nullable=True)
 
     # Relationships
-    users: Mapped[List["AuthUserTable"]] = relationship(
-        "AuthUserTable",
-        secondary="auth_user_account_association",
-        back_populates="accounts",
-    )
+    # TODO: Re-enable after auth_user_account_association table is created
+    # users: Mapped[List["AuthUserTable"]] = relationship(
+    #     "AuthUserTable",
+    #     secondary="auth_user_account_association",
+    #     back_populates="accounts",
+    #     foreign_keys="[AuthUserAccountAssociation.auth_user_id, AuthUserAccountAssociation.account_id]",
+    # )
 
     def __repr__(self) -> str:
         return f"<Account(id={self.account_id}, name='{self.account_name}', \

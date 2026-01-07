@@ -16,9 +16,9 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
-from common.service_connections.db_service.database import session
-from common.service_connections.db_service.database.tables.account import AccountTable
+from common.service_connections.db_service.database.tables.account_tables.account import AccountTable
 from common.service_connections.db_service.database.tables.action_chain import (
     ActionChainTable,
 )
@@ -66,7 +66,7 @@ def _get_fixture_counter() -> int:
 
 
 @pytest.fixture(scope="function")
-def account_factory(engine: Engine):
+def account_factory(engine: Engine, session: Session):
     """Factory fixture for creating account records with synthetic data.
 
     Usage:
@@ -89,7 +89,7 @@ def account_factory(engine: Engine):
         """Create account with synthetic data."""
         counter = _get_fixture_counter()
 
-        with session(engine) as db_session:
+        with session() as db_session:
             account = AccountTable(
                 account_id=str(uuid4()),
                 account_name=name or f"Test Account {counter:03d}",
@@ -104,7 +104,7 @@ def account_factory(engine: Engine):
     yield _create_account
 
     # Cleanup: Delete all created accounts
-    with session(engine) as db_session:
+    with session() as db_session:
         for account_id in created_account_ids:
             account = db_session.get(AccountTable, account_id)
             if account:
@@ -113,7 +113,7 @@ def account_factory(engine: Engine):
 
 
 @pytest.fixture(scope="function")
-def system_under_test_factory(engine: Engine, account_factory):
+def system_under_test_factory(engine: Engine, session: Session, account_factory):
     """Factory fixture for creating SystemUnderTest records.
 
     Usage:
@@ -138,7 +138,7 @@ def system_under_test_factory(engine: Engine, account_factory):
         """Create SystemUnderTest with synthetic data."""
         counter = _get_fixture_counter()
 
-        with session(engine) as db_session:
+        with session() as db_session:
             sut = SystemUnderTestTable(
                 sut_id=str(uuid4()),
                 system_name=name or f"Test System {counter:03d}",
@@ -156,7 +156,7 @@ def system_under_test_factory(engine: Engine, account_factory):
     yield _create_sut
 
     # Cleanup: Cascade delete handles most cleanup, but ensure explicit delete
-    with session(engine) as db_session:
+    with session() as db_session:
         for sut_id in created_sut_ids:
             sut = db_session.get(SystemUnderTestTable, sut_id)
             if sut:
@@ -165,7 +165,7 @@ def system_under_test_factory(engine: Engine, account_factory):
 
 
 @pytest.fixture(scope="function")
-def test_case_factory(engine: Engine, system_under_test_factory, account_factory):
+def test_case_factory(engine: Engine, session: Session, system_under_test_factory, account_factory):
     """Factory fixture for creating TestCase records.
 
     Usage:
@@ -192,7 +192,7 @@ def test_case_factory(engine: Engine, system_under_test_factory, account_factory
         """Create TestCase with synthetic data."""
         counter = _get_fixture_counter()
 
-        with session(engine) as db_session:
+        with session() as db_session:
             test_case = TestCaseTable(
                 test_case_id=str(uuid4()),
                 test_case_name=name or f"Test Case {counter:03d}",
@@ -211,7 +211,7 @@ def test_case_factory(engine: Engine, system_under_test_factory, account_factory
     yield _create_test_case
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for test_case_id in created_test_case_ids:
             test_case = db_session.get(TestCaseTable, test_case_id)
             if test_case:
@@ -220,7 +220,7 @@ def test_case_factory(engine: Engine, system_under_test_factory, account_factory
 
 
 @pytest.fixture(scope="function")
-def suite_factory(engine: Engine, account_factory):
+def suite_factory(engine: Engine, session: Session, account_factory):
     """Factory fixture for creating Suite records.
 
     Yields:
@@ -237,7 +237,7 @@ def suite_factory(engine: Engine, account_factory):
         """Create Suite with synthetic data."""
         counter = _get_fixture_counter()
 
-        with session(engine) as db_session:
+        with session() as db_session:
             suite = SuiteTable(
                 suite_id=str(uuid4()),
                 suite_name=name or f"Test Suite {counter:03d}",
@@ -255,7 +255,7 @@ def suite_factory(engine: Engine, account_factory):
     yield _create_suite
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for suite_id in created_suite_ids:
             suite = db_session.get(SuiteTable, suite_id)
             if suite:
@@ -264,7 +264,7 @@ def suite_factory(engine: Engine, account_factory):
 
 
 @pytest.fixture(scope="function")
-def plan_factory(engine: Engine, account_factory):
+def plan_factory(engine: Engine, session: Session, account_factory):
     """Factory fixture for creating Plan records.
 
     Yields:
@@ -281,7 +281,7 @@ def plan_factory(engine: Engine, account_factory):
         """Create Plan with synthetic data."""
         counter = _get_fixture_counter()
 
-        with session(engine) as db_session:
+        with session() as db_session:
             plan = PlanTable(
                 plan_id=str(uuid4()),
                 plan_name=name or f"Test Plan {counter:03d}",
@@ -300,7 +300,7 @@ def plan_factory(engine: Engine, account_factory):
     yield _create_plan
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for plan_id in created_plan_ids:
             plan = db_session.get(PlanTable, plan_id)
             if plan:
@@ -314,7 +314,7 @@ def plan_factory(engine: Engine, account_factory):
 
 
 @pytest.fixture(scope="function")
-def suite_test_case_association_factory(engine: Engine):
+def suite_test_case_association_factory(engine: Engine, session: Session):
     """Factory fixture for creating SuiteTestCaseAssociation records.
 
     Yields:
@@ -326,7 +326,7 @@ def suite_test_case_association_factory(engine: Engine):
         suite_id: str, test_case_id: str, execution_order: int = 0
     ) -> str:
         """Create SuiteTestCaseAssociation."""
-        with session(engine) as db_session:
+        with session() as db_session:
             assoc = SuiteTestCaseAssociation(
                 association_id=str(uuid4()),
                 suite_id=suite_id,
@@ -343,7 +343,7 @@ def suite_test_case_association_factory(engine: Engine):
     yield _create_association
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for assoc_id in created_association_ids:
             assoc = db_session.get(SuiteTestCaseAssociation, assoc_id)
             if assoc:
@@ -352,7 +352,7 @@ def suite_test_case_association_factory(engine: Engine):
 
 
 @pytest.fixture(scope="function")
-def plan_suite_association_factory(engine: Engine):
+def plan_suite_association_factory(engine: Engine, session: Session):
     """Factory fixture for creating PlanSuiteAssociation records.
 
     Yields:
@@ -362,7 +362,7 @@ def plan_suite_association_factory(engine: Engine):
 
     def _create_association(plan_id: str, suite_id: str, execution_order: int = 0) -> str:
         """Create PlanSuiteAssociation."""
-        with session(engine) as db_session:
+        with session() as db_session:
             assoc = PlanSuiteAssociation(
                 association_id=str(uuid4()),
                 plan_id=plan_id,
@@ -379,7 +379,7 @@ def plan_suite_association_factory(engine: Engine):
     yield _create_association
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for assoc_id in created_association_ids:
             assoc = db_session.get(PlanSuiteAssociation, assoc_id)
             if assoc:
@@ -393,7 +393,7 @@ def plan_suite_association_factory(engine: Engine):
 
 
 @pytest.fixture(scope="function")
-def action_chain_factory(engine: Engine, account_factory, system_under_test_factory):
+def action_chain_factory(engine: Engine, session: Session, account_factory, system_under_test_factory):
     """Factory fixture for creating ActionChain records with JSONB steps.
 
     Yields:
@@ -411,7 +411,7 @@ def action_chain_factory(engine: Engine, account_factory, system_under_test_fact
         """Create ActionChain with synthetic data."""
         counter = _get_fixture_counter()
 
-        with session(engine) as db_session:
+        with session() as db_session:
             chain = ActionChainTable(
                 action_chain_id=str(uuid4()),
                 action_chain_name=name or f"Test Action Chain {counter:03d}",
@@ -430,7 +430,7 @@ def action_chain_factory(engine: Engine, account_factory, system_under_test_fact
     yield _create_action_chain
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for chain_id in created_chain_ids:
             chain = db_session.get(ActionChainTable, chain_id)
             if chain:
@@ -439,7 +439,7 @@ def action_chain_factory(engine: Engine, account_factory, system_under_test_fact
 
 
 @pytest.fixture(scope="function")
-def entity_tag_factory(engine: Engine, account_factory):
+def entity_tag_factory(engine: Engine, session: Session, account_factory):
     """Factory fixture for creating EntityTag records (polymorphic).
 
     Yields:
@@ -457,7 +457,7 @@ def entity_tag_factory(engine: Engine, account_factory):
         tag_value: Optional[str] = None,
     ) -> str:
         """Create EntityTag."""
-        with session(engine) as db_session:
+        with session() as db_session:
             tag = EntityTagTable(
                 tag_id=str(uuid4()),
                 entity_type=entity_type,
@@ -478,7 +478,7 @@ def entity_tag_factory(engine: Engine, account_factory):
     yield _create_tag
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for tag_id in created_tag_ids:
             tag = db_session.get(EntityTagTable, tag_id)
             if tag:
@@ -492,7 +492,7 @@ def entity_tag_factory(engine: Engine, account_factory):
 
 
 @pytest.fixture(scope="function")
-def audit_log_factory(engine: Engine):
+def audit_log_factory(engine: Engine, session: Session):
     """Factory fixture for creating AuditLog records (INSERT-ONLY).
 
     NOTE: No cleanup - audit logs are immutable. Use test database isolation.
@@ -512,7 +512,7 @@ def audit_log_factory(engine: Engine):
         details: Optional[dict] = None,
     ) -> str:
         """Create AuditLog (immutable)."""
-        with session(engine) as db_session:
+        with session() as db_session:
             audit = AuditLogTable(
                 audit_id=str(uuid4()),
                 entity_type=entity_type,
@@ -535,7 +535,7 @@ def audit_log_factory(engine: Engine):
 
 
 @pytest.fixture(scope="function")
-def purge_schedule_factory(engine: Engine):
+def purge_schedule_factory(engine: Engine, session: Session):
     """Factory fixture for creating PurgeTable records (admin-only).
 
     Yields:
@@ -545,7 +545,7 @@ def purge_schedule_factory(engine: Engine):
 
     def _create_purge_schedule(table_name: str, purge_interval_days: int = 30) -> str:
         """Create PurgeTable schedule."""
-        with session(engine) as db_session:
+        with session() as db_session:
             purge = PurgeTable(
                 purge_id=str(uuid4()),
                 table_name=table_name,
@@ -561,7 +561,7 @@ def purge_schedule_factory(engine: Engine):
     yield _create_purge_schedule
 
     # Cleanup
-    with session(engine) as db_session:
+    with session() as db_session:
         for purge_id in created_purge_ids:
             purge = db_session.get(PurgeTable, purge_id)
             if purge:

@@ -10,13 +10,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
 from common.service_connections.db_service.database.base import Base
-from common.service_connections.db_service.database.tables.action_tables.user_interface_action.fenrir_actions import (
-    FenrirActionsTable,
-)
 
 if TYPE_CHECKING:
     from common.service_connections.db_service.database.tables.action_tables.user_interface_action.identifier import (
         IdentifierTable,
+    )
+    from common.service_connections.db_service.database.tables.system_under_test import (
+        SystemUnderTestTable,
     )
 
 
@@ -54,6 +54,12 @@ class PageTable(Base):
     __tablename__ = "page"
 
     page_id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
+    # TODO: Re-enable after fixing migration
+    # sut_id: Mapped[str] = mapped_column(
+    #     sql.String(36),
+    #     sql.ForeignKey("system_under_test.sut_id", ondelete="CASCADE"),
+    #     nullable=False,
+    # )
     page_name: Mapped[str] = mapped_column(sql.String(96), unique=True, nullable=False)
     page_url: Mapped[str] = mapped_column(sql.String(1024), nullable=False)
     environments: Mapped[Dict] = mapped_column(JSONB, nullable=False)
@@ -76,15 +82,21 @@ class PageTable(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    # One-to-many relationship with identifiers
+    # Relationships
+    # TODO: Re-enable after fixing migration
+    # system: Mapped["SystemUnderTestTable"] = relationship(
+    #     "SystemUnderTestTable",
+    #     back_populates="pages",
+    # )
     identifiers: Mapped[List["IdentifierTable"]] = relationship(
         "IdentifierTable", back_populates="page", cascade="all, delete-orphan"
     )
-    fenrir_actions: Mapped[List["FenrirActionsTable"]] = relationship(
-        "FenrirActionsTable",
-        secondary="page_fenrir_action_association",
-        back_populates="pages",
-    )
+    # TODO: Re-enable after page_fenrir_action_association table is created
+    # fenrir_actions: Mapped[List["FenrirActionsTable"]] = relationship(
+    #     "FenrirActionsTable",
+    #     secondary="page_fenrir_action_association",
+    #     back_populates="pages",
+    # )
 
     __table_args__ = (
         sql.Index("idx_page_pk", "page_id"),

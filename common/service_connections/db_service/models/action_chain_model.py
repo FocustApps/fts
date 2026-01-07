@@ -214,7 +214,7 @@ def insert_action_chain(
         action_chain.action_chain_id = None
         logging.warning("Action Chain ID will only be set by the system")
     
-    with session(engine) as db_session:
+    with session() as db_session:
         action_chain.created_at = datetime.now(timezone.utc)
         db_chain = ActionChainTable(**action_chain.model_dump())
         db_session.add(db_chain)
@@ -228,7 +228,7 @@ def query_action_chain_by_id(
     action_chain_id: str, session: Session, engine: Engine
 ) -> ActionChainModel:
     """Retrieve an action chain by ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = (
             db_session.query(ActionChainTable)
             .filter(ActionChainTable.action_chain_id == action_chain_id)
@@ -244,7 +244,7 @@ def query_all_action_chains(
     session: Session, engine: Engine
 ) -> List[ActionChainModel]:
     """Retrieve all active action chains."""
-    with session(engine) as db_session:
+    with session() as db_session:
         chains = (
             db_session.query(ActionChainTable)
             .filter(ActionChainTable.is_active == True)
@@ -257,7 +257,7 @@ def update_action_chain_by_id(
     action_chain_id: str, action_chain: ActionChainModel, session: Session, engine: Engine
 ) -> ActionChainModel:
     """Update an existing action chain."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -278,7 +278,7 @@ def drop_action_chain_by_id(
     action_chain_id: str, session: Session, engine: Engine
 ) -> int:
     """Hard delete an action chain (use with caution - prefer soft delete)."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -295,7 +295,7 @@ def query_action_chains_by_account(
     account_id: str, session: Session, engine: Engine
 ) -> List[ActionChainModel]:
     """Query active action chains filtered by account_id."""
-    with session(engine) as db_session:
+    with session() as db_session:
         chains = (
             db_session.query(ActionChainTable)
             .filter(ActionChainTable.account_id == account_id)
@@ -309,7 +309,7 @@ def query_action_chains_by_sut(
     sut_id: str, session: Session, engine: Engine
 ) -> List[ActionChainModel]:
     """Query active action chains for a specific system under test."""
-    with session(engine) as db_session:
+    with session() as db_session:
         chains = (
             db_session.query(ActionChainTable)
             .filter(ActionChainTable.sut_id == sut_id)
@@ -323,7 +323,7 @@ def deactivate_action_chain_by_id(
     action_chain_id: str, deactivated_by_user_id: str, session: Session, engine: Engine
 ) -> ActionChainModel:
     """Soft delete an action chain."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -342,7 +342,7 @@ def reactivate_action_chain_by_id(
     action_chain_id: str, session: Session, engine: Engine
 ) -> ActionChainModel:
     """Reactivate a soft-deleted action chain."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -381,7 +381,7 @@ def add_step_to_chain(
     Returns:
         Updated ActionChainModel
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -421,7 +421,7 @@ def remove_step_from_chain(
     Returns:
         Updated ActionChainModel
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -461,7 +461,7 @@ def update_step_at_index(
     Returns:
         Updated ActionChainModel
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -501,7 +501,7 @@ def reorder_steps(
     Returns:
         Updated ActionChainModel
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -552,7 +552,7 @@ def validate_action_references(
             "total_steps": int
         }
     """
-    with session(engine) as db_session:
+    with session() as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")

@@ -57,7 +57,7 @@ def insert_page(page: PageModel, engine: Engine, session: Session) -> PageModel:
     if page.id:
         page.id = None
         logging.error("Page ID must be None to insert a new page.")
-    with session(engine) as db_session:
+    with session() as db_session:
         # Create PageTable without identifiers first
         page_data = page.model_dump(exclude={"identifiers"})
         page_data["created_at"] = datetime.now()
@@ -83,7 +83,7 @@ def insert_page(page: PageModel, engine: Engine, session: Session) -> PageModel:
 
 def query_page_by_id(page_id: int, engine: Engine, session: Session) -> PageModel:
     """Query a page by its ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         page = db_session.query(PageTable).filter(PageTable.id == page_id).first()
         if not page:
             raise ValueError(f"Page with ID {page_id} not found.")
@@ -92,7 +92,7 @@ def query_page_by_id(page_id: int, engine: Engine, session: Session) -> PageMode
 
 def query_all_pages(engine: Engine, session: Session) -> List[PageModel]:
     """Query all pages from the database."""
-    with session(engine) as db_session:
+    with session() as db_session:
         pages = db_session.query(PageTable).all()
         return [_convert_page_table_to_model(page) for page in pages]
 
@@ -128,7 +128,7 @@ def update_page_by_id(
     page_id: int, page: PageModel, engine: Engine, session: Session
 ) -> PageModel:
     """Update a page by its ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_page = db_session.get(PageTable, page_id)
         if not db_page:
             raise ValueError(f"Page with ID {page_id} not found.")
@@ -165,7 +165,7 @@ def update_page_by_id(
 
 def drop_page_by_id(page_id: int, engine: Engine, session: Session) -> int:
     """Delete a page by its ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         page = db_session.get(PageTable, page_id)
         if not page:
             raise ValueError(f"Page with ID {page_id} not found.")
@@ -177,7 +177,7 @@ def drop_page_by_id(page_id: int, engine: Engine, session: Session) -> int:
 
 def query_page_by_name(page_name: str, engine: Engine, session: Session) -> PageTable:
     """Query a page by its name."""
-    with session(engine) as db_session:
+    with session() as db_session:
         return (
             db_session.query(PageTable).filter(PageTable.page_name == page_name).first()
         )
@@ -187,7 +187,7 @@ def query_page_by_environment(
     environment: str, engine: Engine, session: Session
 ) -> PageTable:
     """Query pages by environment."""
-    with session(engine) as db_session:
+    with session() as db_session:
         return (
             db_session.query(PageTable)
             .filter(PageTable.environments == environment)

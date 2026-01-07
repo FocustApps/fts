@@ -17,8 +17,6 @@ class DatabaseTypeEnum(Enum):
     POSTGRES = "postgres"
     MYSQL = "mysql"
     MSSQL = "mssql"
-    SQLITE = "sqlite"
-    MONGODB = "mongodb"
 
     @classmethod
     def get_database_types(cls):
@@ -136,17 +134,11 @@ def resolve_database_engine(database_config: DatabaseServiceConfig) -> Engine:
     """
     connection_string = build_connection_string(database_config=database_config)
 
-    # Set connect_args based on database type
-    connect_args = {}
-    if database_config.database_type == DatabaseTypeEnum.SQLITE:
-        connect_args = {"check_same_thread": False}
-
     try:
         engine: Engine = create_engine(
             connection_string,
             echo=database_config.database_echo,
             pool_size=database_config.database_pool_size,
-            connect_args=connect_args,
             pool_pre_ping=True,
         )
         logging.debug(f"Database connection string: {connection_string}")

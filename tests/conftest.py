@@ -10,6 +10,29 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+
+# Load environment variables for database connection
+load_dotenv()
+
+from common.service_connections.db_service.db_manager import DB_ENGINE
+
+# Import database model fixtures
+pytest_plugins = ["tests.fixtures.db_model_fixtures"]
+
+
+@pytest.fixture(scope="session")
+def engine() -> Engine:
+    """Provide database engine for tests using db_manager configuration."""
+    return DB_ENGINE
+
+
+@pytest.fixture(scope="function")
+def session(engine: Engine):
+    """Provide sessionmaker for database tests."""
+    return sessionmaker(bind=engine)
 
 
 @pytest.fixture

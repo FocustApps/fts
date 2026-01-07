@@ -46,7 +46,7 @@ class IdentifierModel(BaseModel):
 
 def query_all_identifiers(engine: Engine, session: Session) -> List[IdentifierModel]:
     """Query all identifiers from the database."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_identifiers = db_session.query(IdentifierTable).all()
         return [
             _convert_identifier_table_to_model(identifier)
@@ -58,7 +58,7 @@ def query_identifier_by_id(
     identifier_id: int, engine: Engine, session: Session
 ) -> IdentifierModel:
     """Query an identifier by its ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_identifier = (
             db_session.query(IdentifierTable)
             .filter(IdentifierTable.id == identifier_id)
@@ -73,7 +73,7 @@ def insert_identifier(
     identifier: IdentifierModel, engine: Engine, session: Session
 ) -> IdentifierModel:
     """Insert a new identifier into the database."""
-    with session(engine) as db_session:
+    with session() as db_session:
         # Create IdentifierTable from IdentifierModel
         identifier_data = identifier.model_dump(exclude={"id"})
         if "created_at" not in identifier_data or identifier_data["created_at"] is None:
@@ -103,7 +103,7 @@ def _convert_identifier_table_to_model(
 
 def drop_identifier_by_id(identifier_id: int, engine: Engine, session: Session) -> int:
     """Delete an identifier by its ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         identifier = (
             db_session.query(IdentifierTable)
             .filter(IdentifierTable.id == identifier_id)
@@ -123,7 +123,7 @@ def update_identifier_by_id(
     session: Session,
 ) -> IdentifierModel:
     """Update an identifier by its ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_identifier = (
             db_session.query(IdentifierTable)
             .filter(IdentifierTable.id == identifier_id)
@@ -149,7 +149,7 @@ def query_identifier_by_element_name(
     element_name: str, engine: Engine, session: Session
 ) -> Optional[IdentifierModel]:
     """Query an identifier by its element name."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_identifier = (
             db_session.query(IdentifierTable)
             .filter(IdentifierTable.element_name == element_name)
@@ -164,7 +164,7 @@ def query_identifier_by_identifier_value(
     identifier_value: str, engine: Engine, session: Session
 ) -> Optional[IdentifierModel]:
     """Query an identifier by its locator query value."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_identifier = (
             db_session.query(IdentifierTable)
             .filter(IdentifierTable.locator_query == identifier_value)

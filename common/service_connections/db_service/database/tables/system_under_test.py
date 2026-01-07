@@ -105,11 +105,12 @@ class SystemUnderTestTable(Base):
         back_populates="system",
         cascade="all, delete-orphan",
     )
-    pages: Mapped[List["PageTable"]] = relationship(
-        "PageTable",
-        back_populates="system",
-        cascade="all, delete-orphan",
-    )
+    # TODO: Re-enable after page table migration is fixed
+    # pages: Mapped[List["PageTable"]] = relationship(
+    #     "PageTable",
+    #     back_populates="system",
+    #     cascade="all, delete-orphan",
+    # )
 
     __table_args__ = (
         sql.Index("idx_sut_pk", "sut_id", postgresql_using="btree"),

@@ -3,20 +3,9 @@ Database package for FTS application.
 
 This package provides centralized database models and configuration,
 using SQLAlchemy ORM with Alembic for migration management.
-
-Usage:
-    from common.service_connections.db_service.database import (
-        Base,
-        PageTable,
-        EnvironmentTable,
-        UserTable,
-        IdentifierTable,
-        EmailProcessorTable,
-        AuthUserTable,
-        SystemEnum,
-        create_database_engine,
-        get_database_session,
-    )
+It includes base classes, enums, table models, and engine/session utilities.
+It consolidates all database-related imports for easy access throughout
+the application.
 """
 
 # Base class

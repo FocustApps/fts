@@ -12,7 +12,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from common.service_connections.db_service.database.base import Base
 
 if TYPE_CHECKING:
-    pass
+    from common.service_connections.db_service.database.tables.action_tables.user_interface_action.page import (
+        PageTable,
+    )
 
 
 class FenrirActionsTable(Base):
@@ -66,6 +68,14 @@ class FenrirActionsTable(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    # TODO: Re-enable after page_fenrir_action_association table is created
+    # Many-to-many relationship with pages
+    # pages: Mapped[List["PageTable"]] = relationship(
+    #     "PageTable",
+    #     secondary="page_fenrir_action_association",
+    #     back_populates="fenrir_actions",
+    # )
 
     def __repr__(self) -> str:
         return f"<FenrirAction(id={self.fenrir_action_id}, method='{self.method_name}', return_type='{self.return_type}')>"

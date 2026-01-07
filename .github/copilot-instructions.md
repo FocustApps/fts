@@ -149,6 +149,31 @@ class InputFieldsSection(AttachmentPage):  # Inherits navigation, adds field int
 - **`docker-compose.yml`** - Local development with PostgreSQL setup
 - **`azure-pipelines*.yml`** - CI/CD patterns (main: auto-test, dev/prod: manual deploy)
 
+## Database Verification Scripts (`checks/`)
+
+The `checks/` directory contains diagnostic scripts for verifying database schema alignment:
+
+- **`check_missing_tables.py`** - Compare SQLAlchemy models against actual database tables; shows which tables exist vs missing
+- **`check_all_tables.py`** - List all tables with their primary keys and first 5 columns
+- **`check_auth_schema.py`** - Inspect `auth_users` and `environment` table schemas + list custom enum types
+- **`compare_schema.py`** - Detailed schema comparison between database and Python models
+- **`check_db_state.py`** - General database state inspection
+
+**When to use**:
+- Before creating migrations: Verify which tables need to be created
+- After migrations: Confirm tables and enums were created successfully
+- Debugging FK errors: Check actual column names and types in database
+- Schema mismatches: Compare model definitions with database reality
+
+**Common workflow**:
+```bash
+python checks/check_missing_tables.py  # See what needs migration
+alembic revision --autogenerate -m "description"
+python checks/check_all_tables.py      # Verify PKs for FK references
+alembic upgrade head
+python checks/check_missing_tables.py  # Confirm all tables created
+```
+
 ## VS Code Integration
 
 The workspace uses specific configurations for the multi-language codebase:

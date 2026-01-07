@@ -63,8 +63,8 @@ from common.service_connections.db_service.models.system_under_test_model import
     insert_system_under_test,
     query_system_under_test_by_id,
     query_all_systems_under_test,
-    update_system_under_test,
-    drop_system_under_test,
+    update_system_under_test_by_id,
+    drop_system_under_test_by_id,
 )
 
 
@@ -76,8 +76,8 @@ from common.service_connections.db_service.models.test_case_model import (
     insert_test_case,
     query_test_case_by_id,
     query_all_test_cases,
-    update_test_case,
-    drop_test_case,
+    update_test_case_by_id,
+    drop_test_case_by_id,
 )
 
 
@@ -89,8 +89,8 @@ from common.service_connections.db_service.models.suite_model import (
     insert_suite,
     query_suite_by_id,
     query_all_suites,
-    update_suite,
-    drop_suite,
+    update_suite_by_id,
+    drop_suite_by_id,
 )
 
 
@@ -115,8 +115,8 @@ from common.service_connections.db_service.models.action_chain_model import (
     insert_action_chain,
     query_action_chain_by_id,
     query_all_action_chains,
-    update_action_chain,
-    drop_action_chain,
+    update_action_chain_by_id,
+    drop_action_chain_by_id,
 )
 
 
@@ -176,7 +176,6 @@ from common.service_connections.db_service.models.test_case_model import (
 from common.service_connections.db_service.models.suite_model import (
     query_suites_by_account,
     query_suites_by_owner,
-    query_suites_by_account_and_owner,
 )
 
 from common.service_connections.db_service.models.action_chain_model import (
@@ -204,25 +203,6 @@ from common.service_connections.db_service.models.audit_log_model import (
 # Soft Delete Operations
 # ============================================================================
 
-from common.service_connections.db_service.models.system_under_test_model import (
-    deactivate_system_under_test,
-    reactivate_system_under_test,
-)
-
-from common.service_connections.db_service.models.test_case_model import (
-    deactivate_test_case,
-    reactivate_test_case,
-)
-
-from common.service_connections.db_service.models.suite_model import (
-    deactivate_suite,
-    reactivate_suite,
-)
-
-from common.service_connections.db_service.models.action_chain_model import (
-    deactivate_action_chain,
-    reactivate_action_chain,
-)
 
 from common.service_connections.db_service.models.entity_tag_model import (
     deactivate_entity_tag,
@@ -367,20 +347,20 @@ __all__ = [
     "insert_system_under_test",
     "query_system_under_test_by_id",
     "query_all_systems_under_test",
-    "update_system_under_test",
-    "drop_system_under_test",
+    "update_system_under_test_by_id",
+    "drop_system_under_test_by_id",
     # CRUD Functions - TestCase
     "insert_test_case",
     "query_test_case_by_id",
     "query_all_test_cases",
-    "update_test_case",
-    "drop_test_case",
+    "update_test_case_by_id",
+    "drop_test_case_by_id",
     # CRUD Functions - Suite
     "insert_suite",
     "query_suite_by_id",
     "query_all_suites",
-    "update_suite",
-    "drop_suite",
+    "update_suite_by_id",
+    "drop_suite_by_id",
     # CRUD Functions - Plan
     "insert_plan",
     "query_plan_by_id",
@@ -391,8 +371,8 @@ __all__ = [
     "insert_action_chain",
     "query_action_chain_by_id",
     "query_all_action_chains",
-    "update_action_chain",
-    "drop_action_chain",
+    "update_action_chain_by_id",
+    "drop_action_chain_by_id",
     # CRUD Functions - EntityTag
     "insert_entity_tag",
     "query_entity_tag_by_id",
@@ -418,7 +398,7 @@ __all__ = [
     "query_test_cases_by_type",
     "query_suites_by_account",
     "query_suites_by_owner",
-    "query_suites_by_account_and_owner",
+    "query_suites_by_sut",
     "query_action_chains_by_account",
     "query_action_chains_by_sut",
     "query_plans_by_account",
@@ -431,14 +411,14 @@ __all__ = [
     "query_sensitive_audit_logs",
     "get_audit_log_count",
     # Soft Delete Operations
-    "deactivate_system_under_test",
-    "reactivate_system_under_test",
-    "deactivate_test_case",
-    "reactivate_test_case",
-    "deactivate_suite",
-    "reactivate_suite",
-    "deactivate_action_chain",
-    "reactivate_action_chain",
+    "deactivate_system_under_test_by_id",
+    "reactivate_system_under_test_by_id",
+    "deactivate_test_case_by_id",
+    "reactivate_test_case_by_id",
+    "deactivate_suite_by_id",
+    "reactivate_suite_by_id",
+    "deactivate_action_chain_by_id",
+    "reactivate_action_chain_by_id",
     "deactivate_entity_tag",
     "reactivate_entity_tag",
     "deactivate_plan",

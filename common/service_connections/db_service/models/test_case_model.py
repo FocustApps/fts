@@ -90,7 +90,7 @@ def insert_test_case(
         test_case.test_case_id = None
         logging.warning("Test Case ID will only be set by the system")
 
-    with session(engine) as db_session:
+    with session() as db_session:
         test_case.created_at = datetime.now(timezone.utc)
         db_test_case = TestCaseTable(**test_case.model_dump())
         db_session.add(db_test_case)
@@ -104,7 +104,7 @@ def query_test_case_by_id(
     test_case_id: str, session: Session, engine: Engine
 ) -> TestCaseModel:
     """Retrieve a test case by ID."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_test_case = (
             db_session.query(TestCaseTable)
             .filter(TestCaseTable.test_case_id == test_case_id)
@@ -118,7 +118,7 @@ def query_test_case_by_id(
 
 def query_all_test_cases(session: Session, engine: Engine) -> List[TestCaseModel]:
     """Retrieve all active test cases."""
-    with session(engine) as db_session:
+    with session() as db_session:
         test_cases = (
             db_session.query(TestCaseTable).filter(TestCaseTable.is_active == True).all()
         )
@@ -129,7 +129,7 @@ def update_test_case_by_id(
     test_case_id: str, test_case: TestCaseModel, session: Session, engine: Engine
 ) -> TestCaseModel:
     """Update an existing test case."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_test_case = db_session.get(TestCaseTable, test_case_id)
         if not db_test_case:
             raise ValueError(f"Test Case ID {test_case_id} not found.")
@@ -148,7 +148,7 @@ def update_test_case_by_id(
 
 def drop_test_case_by_id(test_case_id: str, session: Session, engine: Engine) -> int:
     """Hard delete a test case (use with caution - prefer soft delete)."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_test_case = db_session.get(TestCaseTable, test_case_id)
         if not db_test_case:
             raise ValueError(f"Test Case ID {test_case_id} not found.")
@@ -165,7 +165,7 @@ def query_test_cases_by_account(
     account_id: str, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
     """Query active test cases filtered by account_id."""
-    with session(engine) as db_session:
+    with session() as db_session:
         test_cases = (
             db_session.query(TestCaseTable)
             .filter(TestCaseTable.account_id == account_id)
@@ -179,7 +179,7 @@ def query_test_cases_by_owner(
     owner_user_id: str, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
     """Query active test cases owned by a specific user."""
-    with session(engine) as db_session:
+    with session() as db_session:
         test_cases = (
             db_session.query(TestCaseTable)
             .filter(TestCaseTable.owner_user_id == owner_user_id)
@@ -193,7 +193,7 @@ def query_test_cases_by_sut(
     sut_id: str, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
     """Query active test cases for a specific system under test."""
-    with session(engine) as db_session:
+    with session() as db_session:
         test_cases = (
             db_session.query(TestCaseTable)
             .filter(TestCaseTable.sut_id == sut_id)
@@ -207,7 +207,7 @@ def query_test_cases_by_type(
     test_type: str, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
     """Query active test cases filtered by test type."""
-    with session(engine) as db_session:
+    with session() as db_session:
         test_cases = (
             db_session.query(TestCaseTable)
             .filter(TestCaseTable.test_type == test_type)
@@ -221,7 +221,7 @@ def deactivate_test_case_by_id(
     test_case_id: str, deactivated_by_user_id: str, session: Session, engine: Engine
 ) -> TestCaseModel:
     """Soft delete a test case."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_test_case = db_session.get(TestCaseTable, test_case_id)
         if not db_test_case:
             raise ValueError(f"Test Case ID {test_case_id} not found.")
@@ -240,7 +240,7 @@ def reactivate_test_case_by_id(
     test_case_id: str, session: Session, engine: Engine
 ) -> TestCaseModel:
     """Reactivate a soft-deleted test case."""
-    with session(engine) as db_session:
+    with session() as db_session:
         db_test_case = db_session.get(TestCaseTable, test_case_id)
         if not db_test_case:
             raise ValueError(f"Test Case ID {test_case_id} not found.")

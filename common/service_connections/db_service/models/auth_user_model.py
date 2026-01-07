@@ -32,7 +32,7 @@ def insert_auth_user(auth_user: AuthUserModel, session: Session, engine) -> Auth
     if auth_user.id:
         auth_user.id = None
         logging.warning("AuthUser ID will only be set by the system")
-    with session(engine) as session:
+    with session() as session:
         auth_user.created_at = datetime.now()
         db_auth_user = AuthUserTable(**auth_user.model_dump())
         session.add(db_auth_user)
@@ -46,7 +46,7 @@ def query_auth_user_by_username(username: str, session: Session, engine) -> Auth
     Placeholder function for querying an authenticated user by username.
     In a real implementation, this would interact with a database.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_user = session.query(AuthUserTable).filter_by(username=username).first()
         if db_auth_user:
             return AuthUserModel(**db_auth_user.__dict__)
@@ -60,7 +60,7 @@ def query_auth_user_by_email(
     Query an authenticated user by email address.
     Returns None if user not found.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_user = session.query(AuthUserTable).filter_by(email=email).first()
         if db_auth_user:
             return AuthUserModel(**db_auth_user.__dict__)
@@ -72,7 +72,7 @@ def query_auth_user_by_id(user_id: int, session: Session, engine) -> AuthUserMod
     Placeholder function for querying an authenticated user by ID.
     In a real implementation, this would interact with a database.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_user = session.query(AuthUserTable).filter_by(id=user_id).first()
         if db_auth_user:
             return AuthUserModel(**db_auth_user.__dict__)
@@ -84,7 +84,7 @@ def deactivate_auth_user(user_id: int, session: Session, engine) -> AuthUserMode
     Deactivate an authenticated user (soft delete).
     Sets is_active=False and clears token information.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_user = session.query(AuthUserTable).filter_by(id=user_id).first()
         if not db_auth_user:
             raise ValueError(f"AuthUser with ID {user_id} not found.")
@@ -105,7 +105,7 @@ def query_all_auth_users(session: Session, engine) -> list[AuthUserModel]:
     Placeholder function for querying all authenticated users.
     In a real implementation, this would interact with a database.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_users = session.query(AuthUserTable).all()
         return [AuthUserModel(**db_auth_user.__dict__) for db_auth_user in db_auth_users]
 
@@ -114,7 +114,7 @@ def query_active_auth_users(session: Session, engine) -> list[AuthUserModel]:
     """
     Query all active authenticated users (is_active=True).
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_users = session.query(AuthUserTable).filter_by(is_active=True).all()
         return [AuthUserModel(**db_auth_user.__dict__) for db_auth_user in db_auth_users]
 
@@ -124,7 +124,7 @@ def check_email_exists(email: str, session: Session, engine) -> bool:
     Helper function to check if a user with the given email address already exists.
     Returns True if email exists, False otherwise.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_user = session.query(AuthUserTable).filter_by(email=email).first()
         return db_auth_user is not None
 
@@ -136,7 +136,7 @@ def update_auth_user_by_id(
     Placeholder function for updating an authenticated user by ID.
     In a real implementation, this would interact with a database.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_user = session.query(AuthUserTable).filter_by(id=user_id).first()
         if not db_auth_user:
             raise ValueError(f"AuthUser ID with {user_id} not found.")
@@ -153,7 +153,7 @@ def drop_user_by_id(user_id: int, session: Session, engine) -> int:
     Placeholder function for deleting an authenticated user by ID.
     In a real implementation, this would interact with a database.
     """
-    with session(engine) as session:
+    with session() as session:
         db_auth_user = session.query(AuthUserTable).filter_by(id=user_id).first()
         if not db_auth_user:
             raise ValueError(f"AuthUser ID with {user_id} not found.")

@@ -17,6 +17,9 @@ if TYPE_CHECKING:
     from common.service_connections.db_service.database.tables.account_tables.account import (
         AccountTable,
     )
+    from common.service_connections.db_service.database.tables.account_tables.auth_user_account_association import (
+        AuthUserAccountAssociation,
+    )
 
 
 class AuthUserTable(Base):
@@ -52,14 +55,12 @@ class AuthUserTable(Base):
 
     __tablename__ = "auth_users"
 
-    auth_user_id: Mapped[int] = mapped_column(sql.Integer, primary_key=True)
-    auth_user_email: Mapped[str] = mapped_column(
-        sql.String(255), unique=True, nullable=False
-    )
-    auth_username: Mapped[Optional[str]] = mapped_column(sql.String(96))
+    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(sql.String(255), unique=True, nullable=False)
+    username: Mapped[Optional[str]] = mapped_column(sql.String(96))
     first_name: Mapped[Optional[str]] = mapped_column(sql.String(255))
     last_name: Mapped[Optional[str]] = mapped_column(sql.String(255))
-    current_auth_token: Mapped[Optional[str]] = mapped_column(sql.String(64))
+    current_token: Mapped[Optional[str]] = mapped_column(sql.String(64))
     token_expires_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
     is_active: Mapped[bool] = mapped_column(sql.Boolean, default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(sql.Boolean, default=False, nullable=False)
@@ -85,18 +86,22 @@ class AuthUserTable(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    accounts: Mapped[List["AccountTable"]] = relationship(
-        "AccountTable",
-        secondary="auth_user_account_association",
-        back_populates="users",
-    )
+    # TODO: Re-enable after auth_user_account_association table is created
+    # accounts: Mapped[List["AccountTable"]] = relationship(
+    #     "AccountTable",
+    #     secondary="auth_user_account_association",
+    #     back_populates="users",
+    #     foreign_keys="[AuthUserAccountAssociation.auth_user_id, AuthUserAccountAssociation.account_id]",
+    # )
 
     def __repr__(self) -> str:
-        return f"<AuthUser(id={self.auth_user_id}, email='{self.auth_user_email}', is_active={self.is_active})>"
+        return (
+            f"<AuthUser(id={self.id}, email='{self.email}', is_active={self.is_active})>"
+        )
 
     def is_token_valid(self) -> bool:
         """Check if the current token is valid and not expired."""
-        if not self.current_auth_token or not self.token_expires_at:
+        if not self.current_token or not self.token_expires_at:
             return False
         return datetime.now(timezone.utc) < self.token_expires_at
 
