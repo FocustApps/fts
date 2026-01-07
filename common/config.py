@@ -180,3 +180,46 @@ def get_chat_service_config() -> ChatServiceConfig:
         webhook_url=os.getenv("WEBHOOK_URL"),
         channel_name=os.getenv("CHANNEL_NAME"),
     )
+
+
+class ValidationConfig(BaseModel):
+    """
+    Configuration for Pydantic model validation in database operations.
+
+    - validate_reads: Enable validation when reading from database (default: False for performance)
+    - validate_writes: Enable validation when writing to database (default: True for data integrity)
+    """
+
+    validate_reads: bool = False
+    validate_writes: bool = True
+
+
+def get_validation_config() -> ValidationConfig:
+    """Get validation configuration from environment variables."""
+    load_dotenv()
+    return ValidationConfig(
+        validate_reads=os.getenv("FTS_VALIDATE_READS", "0").lower()
+        in ("1", "true", "yes"),
+        validate_writes=os.getenv("FTS_VALIDATE_WRITES", "1").lower()
+        in ("1", "true", "yes"),
+    )
+
+
+def should_validate_read() -> bool:
+    """
+    Check if validation should be performed for read operations.
+
+    Returns False by default for performance on bulk queries.
+    Set FTS_VALIDATE_READS=1 to enable.
+    """
+    return get_validation_config().validate_reads
+
+
+def should_validate_write() -> bool:
+    """
+    Check if validation should be performed for write operations.
+
+    Returns True by default to ensure data integrity.
+    Set FTS_VALIDATE_WRITES=0 to disable (not recommended).
+    """
+    return get_validation_config().validate_writes

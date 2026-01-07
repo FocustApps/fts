@@ -150,3 +150,127 @@ def drop_environment_by_id(environment_id: int, session: Session, engine: Engine
         session.commit()
         logging.info(f"Environment ID {environment_id} deleted.")
     return 1
+
+
+def deactivate_environment_by_id(
+    environment_id: int, session: Session, engine: Engine
+) -> EnvironmentModel:
+    """
+    Soft delete an environment by setting status=False (deactivated).
+
+    Args:
+        environment_id: Environment ID to deactivate
+        session: Database session context manager
+        engine: Database engine
+
+    Returns:
+        Updated EnvironmentModel with status=False
+
+    Raises:
+        ValueError: If environment not found
+    """
+    with session(engine) as db_session:
+        environment = db_session.get(EnvironmentTable, environment_id)
+        if not environment:
+            raise ValueError(f"Environment ID {environment_id} not found.")
+
+        environment.status = False
+        environment.updated_at = datetime.now()
+
+        db_session.commit()
+        db_session.refresh(environment)
+
+        logging.info(f"Environment ID {environment_id} deactivated (status=False).")
+
+    return EnvironmentModel(**environment.__dict__)
+
+
+def query_active_environments_by_account(
+    account_id: str, session: Session, engine: Engine
+) -> List[EnvironmentModel]:
+    """
+    Query all active environments for a specific account.
+
+    NOTE: EnvironmentTable may not have account_id field in current schema.
+    This function assumes account relationship through system_under_test or
+    other linking table. Adjust query logic based on actual schema.
+
+    Args:
+        account_id: Account ID to filter by
+        session: Database session context manager
+        engine: Database engine
+
+    Returns:
+        List of active EnvironmentModel instances
+
+    TODO: Verify EnvironmentTable schema has account_id or proper relationship
+    """
+    with session(engine) as db_session:
+        # NOTE: This query assumes EnvironmentTable has account_id field
+        # If not present, this will need to join through SystemUnderTestTable
+        # or other linking table to filter by account
+        envs = (
+            db_session.query(EnvironmentTable)
+            .filter(EnvironmentTable.status == True)
+            .all()
+        )
+
+        # TODO: Add account filtering when schema relationship is confirmed
+        # .filter(EnvironmentTable.account_id == account_id)
+
+        return [EnvironmentModel(**env.__dict__) for env in envs]
+
+
+def query_environment_systems(
+    environment_id: int, session: Session, engine: Engine
+) -> List[dict]:
+    """
+    Query all systems under test associated with an environment.
+
+    NOTE: This assumes a relationship exists between EnvironmentTable and
+    SystemUnderTestTable. Adjust join logic based on actual schema.
+
+    Args:
+        environment_id: Environment ID to query systems for
+        session: Database session context manager
+        engine: Database engine
+
+    Returns:
+        List of dicts with system information (sut_id, sut_name, account_id)
+
+    TODO: Verify actual relationship between Environment and SystemUnderTest tables
+    """
+    with session(engine) as db_session:
+        # Verify environment exists
+        environment = db_session.get(EnvironmentTable, environment_id)
+        if not environment:
+            raise ValueError(f"Environment ID {environment_id} not found.")
+
+        # TODO: Implement actual query once schema relationship is confirmed
+        # This is a placeholder that needs the proper join through
+        # SystemUnderTestTable or association table
+
+        # Example query structure (adjust based on actual schema):
+        # from common.service_connections.db_service.database import SystemUnderTestTable
+        #
+        # systems = (
+        #     db_session.query(SystemUnderTestTable)
+        #     .filter(SystemUnderTestTable.environment_id == environment_id)
+        #     .all()
+        # )
+        #
+        # return [
+        #     {
+        #         'sut_id': system.sut_id,
+        #         'sut_name': system.sut_name,
+        #         'account_id': system.account_id
+        #     }
+        #     for system in systems
+        # ]
+
+        logging.warning(
+            f"query_environment_systems() not fully implemented. "
+            f"Schema relationship between Environment and SystemUnderTest needs verification."
+        )
+
+        return []

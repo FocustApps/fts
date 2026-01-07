@@ -18,13 +18,29 @@ from common.service_connections.db_service.database import (
     Base,
     # Enums
     SystemEnum,
-    # Tables
+    # Existing tables
     PageTable,
     EnvironmentTable,
     SystemUnderTestUserTable,
     IdentifierTable,
     EmailProcessorTable,
     AuthUserTable,
+    # New core tables
+    AccountTable,
+    AuthTokenTable,
+    AuditLogTable,
+    SystemUnderTestTable,
+    PlanTable,
+    SuiteTable,
+    TestCaseTable,
+    ActionChainTable,
+    EntityTagTable,
+    # Junction tables
+    AuthUserAccountAssociation,
+    PageFenrirActionAssociation,
+    PlanSuiteAssociation,
+    SuiteTestCaseAssociation,
+    SystemEnvironmentAssociation,
     # Engine utilities
     create_database_engine,
     create_session_factory,
@@ -39,12 +55,30 @@ from common.service_connections.db_service.database import (
 __all__ = [
     "Base",
     "SystemEnum",
+    # Existing tables
     "PageTable",
     "EnvironmentTable",
     "SystemUnderTestUserTable",
     "IdentifierTable",
     "EmailProcessorTable",
     "AuthUserTable",
+    # New core tables
+    "AccountTable",
+    "AuthTokenTable",
+    "AuditLogTable",
+    "SystemUnderTestTable",
+    "PlanTable",
+    "SuiteTable",
+    "TestCaseTable",
+    "ActionChainTable",
+    "EntityTagTable",
+    # Junction tables
+    "AuthUserAccountAssociation",
+    "PageFenrirActionAssociation",
+    "PlanSuiteAssociation",
+    "SuiteTestCaseAssociation",
+    "SystemEnvironmentAssociation",
+    # Engine utilities
     "create_database_engine",
     "create_session_factory",
     "create_all_tables",
