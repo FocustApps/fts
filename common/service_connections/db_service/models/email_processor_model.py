@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 # Import centralized database components
-from .database import EmailProcessorTable, SystemEnum
+from common.service_connections.db_service.database import EmailProcessorTable, SystemEnum
 
 
 class EmailProcessorModel(BaseModel):
@@ -53,7 +53,7 @@ def query_email_item_by_id(
     with session(engine) as session:
         email_item = (
             session.query(EmailProcessorTable)
-            .filter(EmailProcessorTable.id == email_item_id)
+            .filter(EmailProcessorTable.email_processor_id == email_item_id)
             .first()
         )
     if not email_item:

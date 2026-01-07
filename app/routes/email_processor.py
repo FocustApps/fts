@@ -10,7 +10,7 @@ from app.dependencies.multi_user_auth_dependency import verify_auth_token
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass
 
-from common.service_connections.db_service.email_processor_model import (
+from common.service_connections.db_service.models.email_processor_model import (
     SystemEnum,
     EmailProcessorModel,
     insert_email_item,

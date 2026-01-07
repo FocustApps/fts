@@ -1,5 +1,4 @@
 from app.routes import (
-    actions,
     auth,
     auth_users,
     email_processor,
@@ -11,8 +10,6 @@ from app.routes import (
 
 
 API_ROUTERS = [
-    actions.actions_views_router,
-    actions.actions_api_router,
     auth.auth_views_router,
     auth.auth_api_router,
     auth_users.auth_users_views_router,

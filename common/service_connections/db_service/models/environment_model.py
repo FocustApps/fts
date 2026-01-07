@@ -7,8 +7,11 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 # Import centralized database components
-from .database import EnvironmentTable, UserTable
-from .user_model import UserModel
+from common.service_connections.db_service.database import (
+    EnvironmentTable,
+    SystemUnderTestUserTable,
+)
+from common.service_connections.db_service.models.user_model import UserModel
 
 
 class EnvironmentModel(BaseModel):
@@ -89,8 +92,8 @@ def query_environment_by_id(
             try:
                 env.users = [
                     UserModel(
-                        **session.query(UserTable)
-                        .filter(UserTable.id == user[0])
+                        **session.query(SystemUnderTestUserTable)
+                        .filter(SystemUnderTestUserTable.sut_user_id == user[0])
                         .first()
                         .__dict__
                     )

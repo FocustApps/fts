@@ -11,7 +11,7 @@ from typing import List
 from common.service_connections.db_service.db_manager import DB_ENGINE
 from app.dependencies.multi_user_auth_dependency import verify_auth_token
 
-from common.service_connections.db_service.page_model import (
+from common.service_connections.db_service.models.page_model import (
     PageModel,
     drop_page_by_id,
     insert_page,

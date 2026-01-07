@@ -7,7 +7,7 @@ import inspect
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 
-from fts.common.selenium_controller import SeleniumController
+from common.selenium_controller import SeleniumController
 
 
 class MethodParameter(BaseModel):

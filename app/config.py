@@ -58,11 +58,11 @@ class BaseAppConfig(BaseModel):
 def get_base_app_config() -> BaseAppConfig:
     load_dotenv()
     return BaseAppConfig(
-        environment=os.getenv("ENVIRONMENT"),
-        api_version=os.getenv("API_VERSION"),
-        htmx_version=os.getenv("HTMX_VERSION"),
-        jquery_version=os.getenv("JQUERY_VERSION"),
-        bootstrap_version=os.getenv("BOOTSTRAP_VERSION"),
+        environment=os.getenv("ENVIRONMENT", "local"),
+        api_version=os.getenv("API_VERSION", "v1"),
+        htmx_version=os.getenv("HTMX_VERSION", "2.0.4"),
+        jquery_version=os.getenv("JQUERY_VERSION", "3.7.1"),
+        bootstrap_version=os.getenv("BOOTSTRAP_VERSION", "5.3.8"),
         auth_token_file_path=Path(os.getenv("AUTH_TOKEN_FILE_PATH", "auth_token.txt")),
         auth_rotation_interval_minutes=int(
             os.getenv("AUTH_ROTATION_INTERVAL_MINUTES", "30")

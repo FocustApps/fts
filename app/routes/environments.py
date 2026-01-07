@@ -15,7 +15,7 @@ from app.dependencies.multi_user_auth_dependency import verify_auth_token
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass
 from common.fenrir_enums import EnvironmentEnum
-from common.service_connections.db_service.environment_model import (
+from common.service_connections.db_service.models.environment_model import (
     EnvironmentModel,
     insert_environment,
     query_all_environments,

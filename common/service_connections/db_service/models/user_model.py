@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 # Import centralized database components
-from .database import UserTable
+from common.service_connections.db_service.database import SystemUnderTestUserTable
 
 
 class UserModel(BaseModel):
@@ -49,7 +49,7 @@ def insert_user(user: UserModel, session: Session, engine) -> UserModel:
         logging.warning("User ID will only be set by the system")
     with session(engine) as session:
         user.created_at = datetime.now()
-        db_user = UserTable(**user.model_dump())
+        db_user = SystemUnderTestUserTable(**user.model_dump())
         session.add(db_user)
         session.commit()
         session.refresh(db_user)
@@ -61,7 +61,11 @@ def query_user_by_username(username: str, session: Session, engine) -> UserModel
     Retrieves a user from the database by username
     """
     with session(engine) as session:
-        user = session.query(UserTable).filter(UserTable.username == username).first()
+        user = (
+            session.query(SystemUnderTestUserTable)
+            .filter(SystemUnderTestUserTable.username == username)
+            .first()
+        )
     if not user:
         raise ValueError(f"Username {username} not found.")
     unpacked_user = UserModel(**user.__dict__)
@@ -73,19 +77,23 @@ def query_user_by_id(user_id: int, session: Session, engine) -> UserModel:
     Retrieves a user from the database by id
     """
     with session(engine) as session:
-        user = session.query(UserTable).filter(UserTable.id == user_id).first()
+        user = (
+            session.query(SystemUnderTestUserTable)
+            .filter(SystemUnderTestUserTable.sut_user_id == user_id)
+            .first()
+        )
     if not user:
         raise ValueError(f"User ID with {user_id} not found.")
     unpacked_user = UserModel(**user.__dict__)
     return unpacked_user
 
 
-def query_all_users(session: Session, engine) -> List[UserTable]:
+def query_all_users(session: Session, engine) -> List[SystemUnderTestUserTable]:
     """
     Retrieves all users from the database
     """
     with session(engine) as session:
-        users = session.query(UserTable).all()
+        users = session.query(SystemUnderTestUserTable).all()
         return [UserModel(**user.__dict__) for user in users]
 
 
@@ -96,7 +104,7 @@ def update_user_by_id(
     Updates a user in the database
     """
     with session(engine) as session:
-        db_user = session.get(UserTable, user_id)
+        db_user = session.get(SystemUnderTestUserTable, user_id)
         if not db_user:
             raise ValueError(f"Environment ID {user_id} not found.")
         user.updated_at = datetime.now()
@@ -115,7 +123,7 @@ def drop_user_by_id(user_id: int, session: Session, engine) -> int:
     """
     # TODO: Implement a cascade deletion for the user field in the environment table.
     with session(engine) as session:
-        user = session.get(UserTable, user_id)
+        user = session.get(SystemUnderTestUserTable, user_id)
         session.delete(user)
         session.commit()
         logging.info(f"User ID {user_id} deleted.")

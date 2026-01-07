@@ -29,7 +29,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from common.selenium_controller import get_selenium_controller_methods_documentation
+from common.selenium_documentation import get_selenium_controller_methods_documentation
 from app.config import get_config
 from app.services.multi_user_auth_service import get_multi_user_auth_service
 
