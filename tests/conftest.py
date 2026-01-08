@@ -20,7 +20,10 @@ load_dotenv()
 from common.service_connections.db_service.db_manager import DB_ENGINE
 
 # Import database model fixtures
-pytest_plugins = ["tests.fixtures.db_model_fixtures"]
+pytest_plugins = [
+    "tests.fixtures.db_model_fixtures",
+    "tests.fixtures.composite_fixtures",  # Domain-based composite fixtures
+]
 
 
 @pytest.fixture(scope="session")

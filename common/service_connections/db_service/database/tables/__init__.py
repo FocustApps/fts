@@ -17,6 +17,9 @@ from common.service_connections.db_service.database.tables.system_under_test_use
 from common.service_connections.db_service.database.tables.action_tables.user_interface_action.identifier import (
     IdentifierTable,
 )
+from common.service_connections.db_service.database.tables.action_tables.user_interface_action.fenrir_actions import (
+    FenrirActionsTable,
+)
 from common.service_connections.db_service.database.tables.email_processor import (
     EmailProcessorTable,
 )
@@ -69,6 +72,7 @@ __all__ = [
     "EnvironmentTable",
     "SystemUnderTestUserTable",
     "IdentifierTable",
+    "FenrirActionsTable",
     "EmailProcessorTable",
     "AuthUserTable",
     # New core tables

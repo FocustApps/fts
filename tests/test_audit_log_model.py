@@ -10,8 +10,13 @@ Tests cover:
 """
 
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
 
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
+from common.service_connections.db_service.database.tables.audit_log import (
+    AuditLogTable,
+)
 from common.service_connections.db_service.models.audit_log_model import (
     AuditLogModel,
     AuditChangeModel,
@@ -27,11 +32,12 @@ class TestAuditLogInsertOnly:
     """Test that audit logs are insert-only (no updates or deletes)."""
 
     def test_insert_audit_log_basic(
-        self, audit_log_factory, account_factory, engine: Engine, session: Session
+        self, audit_log_factory, auth_user_factory, account_factory, engine: Engine
     ):
         """Test basic audit log insertion."""
         # Arrange
-        account_id = account_factory()
+        user_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=user_id)
 
         # Act
         log_id = audit_log_factory(
@@ -39,17 +45,21 @@ class TestAuditLogInsertOnly:
             entity_type="test_case",
             entity_id="test-123",
             action="created",
-            performed_by_user_id="user-456",
+            performed_by_user_id=user_id,
         )
 
-        # Assert
-        with session(engine) as db_session:
-            log = db_session.query(AuditLogModel).filter_by(audit_log_id=log_id).first()
+        # Assert - Query using the audit_id directly
+        with session() as db_session:
+            from common.service_connections.db_service.database.tables.audit_log import (
+                AuditLogTable,
+            )
+
+            log = db_session.query(AuditLogTable).filter_by(audit_id=log_id).first()
 
         assert log is not None
         assert log.entity_type == "test_case"
         assert log.action == "created"
-        assert log.performed_by_user_id == "user-456"
+        assert log.performed_by_user_id == user_id
 
     def test_audit_log_has_no_update_function(self):
         """Test that no update function exists for audit logs."""
@@ -60,34 +70,41 @@ class TestAuditLogInsertOnly:
         assert not hasattr(audit_log_model, "update_audit_log")
         assert not hasattr(audit_log_model, "delete_audit_log")
 
-    def test_insert_audit_log_with_changes(self, account_factory, engine: Engine):
+    def test_insert_audit_log_with_changes(
+        self, account_factory, auth_user_factory, engine: Engine
+    ):
         """Test audit log with before/after changes."""
         # Arrange
-        account_id = account_factory()
+        user_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=user_id)
 
         changes = AuditChangeModel(
             field_name="status", old_value="draft", new_value="published"
         )
 
-        # Act
-        log_id = insert_audit_log(
+        audit_log = AuditLogModel(
             account_id=account_id,
             entity_type="suite",
             entity_id="suite-789",
             action="updated",
-            performed_by_user_id="editor-user",
-            changes=changes,
+            performed_by_user_id=user_id,
+            details=changes.model_dump(),
+        )
+
+        # Act
+        log_id = insert_audit_log(
+            model=audit_log,
             engine=engine,
         )
 
         # Assert
-        with session(engine) as db_session:
-            log = db_session.query(AuditLogModel).filter_by(audit_log_id=log_id).first()
+        with session() as db_session:
+            log = db_session.query(AuditLogTable).filter_by(audit_id=log_id).first()
 
-        assert log.changes is not None
-        assert log.changes.field_name == "status"
-        assert log.changes.old_value == "draft"
-        assert log.changes.new_value == "published"
+        assert log.details is not None
+        assert log.details["field_name"] == "status"
+        assert log.details["old_value"] == "draft"
+        assert log.details["new_value"] == "published"
 
 
 class TestAuditChangeModelJSONB:
@@ -127,10 +144,13 @@ class TestAuditChangeModelJSONB:
         assert change.old_value == "Old notes"
         assert change.new_value is None
 
-    def test_audit_log_with_multiple_changes(self, account_factory, engine: Engine):
+    def test_audit_log_with_multiple_changes(
+        self, account_factory, auth_user_factory, engine: Engine
+    ):
         """Test audit log can store complex change objects."""
         # Arrange
-        account_id = account_factory()
+        user_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=user_id)
 
         # Multiple field changes could be represented as nested structure
         complex_changes = AuditChangeModel(
@@ -139,24 +159,28 @@ class TestAuditChangeModelJSONB:
             new_value={"version": 2, "tags": ["new", "updated"]},
         )
 
-        # Act
-        log_id = insert_audit_log(
+        audit_log = AuditLogModel(
             account_id=account_id,
             entity_type="plan",
             entity_id="plan-complex",
             action="updated",
-            performed_by_user_id="admin",
-            changes=complex_changes,
+            performed_by_user_id=user_id,
+            details=complex_changes.model_dump(),
+        )
+
+        # Act
+        log_id = insert_audit_log(
+            model=audit_log,
             engine=engine,
         )
 
         # Assert
-        with session(engine) as db_session:
-            log = db_session.query(AuditLogModel).filter_by(audit_log_id=log_id).first()
+        with session() as db_session:
+            log = db_session.query(AuditLogTable).filter_by(audit_id=log_id).first()
 
-        assert isinstance(log.changes.old_value, dict)
-        assert isinstance(log.changes.new_value, dict)
-        assert log.changes.new_value["version"] == 2
+        assert isinstance(log.details["old_value"], dict)
+        assert isinstance(log.details["new_value"], dict)
+        assert log.details["new_value"]["version"] == 2
 
 
 class TestAuditLogQueries:
@@ -193,18 +217,17 @@ class TestAuditLogQueries:
         )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             logs = query_audit_logs_by_entity(
                 entity_type="suite",
                 entity_id=entity_id,
-                account_id=account_id,
                 session=db_session,
                 engine=engine,
             )
 
         # Assert - Should get chronological history
         assert len(logs) >= 3
-        log_ids = {log.audit_log_id for log in logs}
+        log_ids = {log.audit_id for log in logs}
         assert log1 in log_ids
         assert log2 in log_ids
         assert log3 in log_ids
@@ -217,82 +240,119 @@ class TestAuditLogQueries:
         account1 = account_factory()
         account2 = account_factory()
 
-        log1 = audit_log_factory(account_id=account1, action="action1")
-        log2 = audit_log_factory(account_id=account1, action="action2")
-        log3 = audit_log_factory(account_id=account2, action="action3")
+        log1 = audit_log_factory(
+            entity_type="test_case",
+            entity_id="test-1",
+            account_id=account1,
+            action="action1",
+        )
+        log2 = audit_log_factory(
+            entity_type="test_case",
+            entity_id="test-2",
+            account_id=account1,
+            action="action2",
+        )
+        log3 = audit_log_factory(
+            entity_type="test_case",
+            entity_id="test-3",
+            account_id=account2,
+            action="action3",
+        )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             account1_logs = query_audit_logs_by_account(
                 account_id=account1, session=db_session, engine=engine
             )
 
         # Assert - Multi-tenant isolation
-        account1_ids = {log.audit_log_id for log in account1_logs}
+        account1_ids = {log.audit_id for log in account1_logs}
         assert log1 in account1_ids
         assert log2 in account1_ids
         assert log3 not in account1_ids
 
-    def test_query_logs_by_user(self, audit_log_factory, account_factory, engine: Engine):
+    def test_query_logs_by_user(
+        self, audit_log_factory, account_factory, auth_user_factory, engine: Engine
+    ):
         """Test querying all actions by a specific user."""
         # Arrange
         account_id = account_factory()
+        user_alpha = auth_user_factory()
+        user_beta = auth_user_factory()
 
         user1_log1 = audit_log_factory(
-            account_id=account_id, performed_by_user_id="user-alpha", action="created"
+            entity_type="suite",
+            entity_id="suite-1",
+            account_id=account_id,
+            performed_by_user_id=user_alpha,
+            action="created",
         )
 
         user1_log2 = audit_log_factory(
-            account_id=account_id, performed_by_user_id="user-alpha", action="updated"
+            entity_type="suite",
+            entity_id="suite-2",
+            account_id=account_id,
+            performed_by_user_id=user_alpha,
+            action="updated",
         )
 
         user2_log = audit_log_factory(
-            account_id=account_id, performed_by_user_id="user-beta", action="deleted"
+            entity_type="suite",
+            entity_id="suite-3",
+            account_id=account_id,
+            performed_by_user_id=user_beta,
+            action="deleted",
         )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             user_alpha_logs = query_audit_logs_by_user(
-                performed_by_user_id="user-alpha",
-                account_id=account_id,
+                user_id=user_alpha,
                 session=db_session,
                 engine=engine,
             )
 
         # Assert
-        user_alpha_ids = {log.audit_log_id for log in user_alpha_logs}
+        user_alpha_ids = {log.audit_id for log in user_alpha_logs}
         assert user1_log1 in user_alpha_ids
         assert user1_log2 in user_alpha_ids
         assert user2_log not in user_alpha_ids
 
-    def test_query_logs_by_sensitivity(self, account_factory, engine: Engine):
+    def test_query_logs_by_sensitivity(
+        self, account_factory, auth_user_factory, engine: Engine
+    ):
         """Test querying logs by sensitivity level."""
         # Arrange
         account_id = account_factory()
+        user_id = auth_user_factory()
 
         # Create logs with different sensitivity
         normal_log = insert_audit_log(
-            account_id=account_id,
-            entity_type="test_case",
-            entity_id="test-1",
-            action="viewed",
-            performed_by_user_id="user-1",
-            is_sensitive=False,
+            model=AuditLogModel(
+                account_id=account_id,
+                entity_type="test_case",
+                entity_id="test-1",
+                action="viewed",
+                performed_by_user_id=user_id,
+                is_sensitive=False,
+            ),
             engine=engine,
         )
 
         sensitive_log = insert_audit_log(
-            account_id=account_id,
-            entity_type="test_case",
-            entity_id="test-2",
-            action="credentials_accessed",
-            performed_by_user_id="admin",
-            is_sensitive=True,
+            model=AuditLogModel(
+                account_id=account_id,
+                entity_type="test_case",
+                entity_id="test-2",
+                action="credentials_accessed",
+                performed_by_user_id=user_id,
+                is_sensitive=True,
+            ),
             engine=engine,
         )
 
         # Act - Query all logs and filter by sensitivity
-        with session(engine) as db_session:
+        with session() as db_session:
             all_logs = query_audit_logs_by_account(
                 account_id=account_id,
                 session=db_session,
@@ -305,36 +365,39 @@ class TestAuditLogQueries:
 
         assert len(sensitive_logs) >= 1
         assert len(non_sensitive_logs) >= 1
-        assert sensitive_log in [log.audit_log_id for log in sensitive_logs]
-        assert normal_log in [log.audit_log_id for log in non_sensitive_logs]
+        assert sensitive_log in [log.audit_id for log in sensitive_logs]
+        assert normal_log in [log.audit_id for log in non_sensitive_logs]
 
 
 class TestBulkAuditOperations:
     """Test bulk insert operations for audit logs."""
 
-    def test_bulk_insert_audit_logs(self, account_factory, engine: Engine):
+    def test_bulk_insert_audit_logs(
+        self, account_factory, auth_user_factory, engine: Engine
+    ):
         """Test inserting multiple audit logs in a single transaction."""
         # Arrange
         account_id = account_factory()
+        user_id = auth_user_factory()
 
         log_data = [
-            {
-                "account_id": account_id,
-                "entity_type": "test_case",
-                "entity_id": f"test-{i}",
-                "action": "bulk_created",
-                "performed_by_user_id": "bulk-user",
-            }
+            AuditLogModel(
+                account_id=account_id,
+                entity_type="test_case",
+                entity_id=f"test-{i}",
+                action="bulk_created",
+                performed_by_user_id=user_id,
+            )
             for i in range(5)
         ]
 
         # Act
-        log_ids = bulk_insert_audit_logs(audit_logs=log_data, engine=engine)
+        log_ids = bulk_insert_audit_logs(models=log_data, engine=engine)
 
         # Assert
         assert len(log_ids) == 5
 
-        with session(engine) as db_session:
+        with session() as db_session:
             logs = query_audit_logs_by_account(
                 account_id=account_id, session=db_session, engine=engine
             )

@@ -12,11 +12,17 @@ import os
 
 from sqlalchemy.engine import Engine
 
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.service_connections.db_service.models.system_under_test_model import (
+    deactivate_system_under_test_by_id as deactivate_system_under_test,
     insert_system_under_test,
     query_system_under_test_by_id,
     query_systems_under_test_by_account,
+    reactivate_system_under_test_by_id as reactivate_system_under_test,
     SystemUnderTestModel,
+    update_system_under_test_by_id as update_system_under_test,
 )
 from common.service_connections.db_service.models.test_case_model import (
     insert_test_case,
@@ -36,49 +42,61 @@ from common.service_connections.db_service.models.suite_model import (
 class TestSystemUnderTestCRUD:
     """Test SystemUnderTest CRUD operations."""
 
-    def test_insert_and_query_system(self, account_factory, session, engine: Engine):
+    def test_insert_and_query_system(
+        self, account_factory, auth_user_factory, engine: Engine
+    ):
         """Test inserting and querying a system under test."""
         # Arrange
-        account_id = account_factory(name="Test Account for SUT")
-        user_id = "test-user-123"
+        user_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=user_id, name="Test Account for SUT")
 
         sut_model = SystemUnderTestModel(
             system_name="Production Web App",
-            system_type="web_application",
             account_id=account_id,
             owner_user_id=user_id,
         )
 
         # Act
-        sut_id = insert_system_under_test(sut_model, session, engine)
+        result = insert_system_under_test(sut_model, session, engine)
 
         # Assert
-        assert sut_id is not None
+        assert result is not None
+        assert result.sut_id is not None
 
         # Query back
-        with session(engine) as db_session:
-            retrieved = query_system_under_test_by_id(sut_id, db_session, engine)
+        with session() as db_session:
+            retrieved = query_system_under_test_by_id(result.sut_id, db_session, engine)
 
         assert retrieved is not None
         assert retrieved.system_name == "Production Web App"
-        assert retrieved.system_type == "web_application"
         assert retrieved.account_id == account_id
         assert retrieved.is_active is True
 
     def test_query_systems_by_account(
-        self, system_under_test_factory, account_factory, engine: Engine
+        self,
+        system_under_test_factory,
+        account_factory,
+        auth_user_factory,
+        engine: Engine,
     ):
         """Test querying systems by account ID."""
         # Arrange
-        account1 = account_factory(name="Account 1")
-        account2 = account_factory(name="Account 2")
+        owner_id = auth_user_factory()
+        account1 = account_factory(owner_user_id=owner_id, name="Account 1")
+        account2 = account_factory(owner_user_id=owner_id, name="Account 2")
 
-        sut1 = system_under_test_factory(account_id=account1, name="SUT 1")
-        sut2 = system_under_test_factory(account_id=account1, name="SUT 2")
-        sut3 = system_under_test_factory(account_id=account2, name="SUT 3")
+        sut1 = system_under_test_factory(
+            account_id=account1, owner_user_id=owner_id, name="SUT 1"
+        )
+        sut2 = system_under_test_factory(
+            account_id=account1, owner_user_id=owner_id, name="SUT 2"
+        )
+        sut3 = system_under_test_factory(
+            account_id=account2, owner_user_id=owner_id, name="SUT 3"
+        )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             account1_systems = query_systems_under_test_by_account(
                 account1, db_session, engine
             )
@@ -91,20 +109,25 @@ class TestSystemUnderTestCRUD:
         assert "SUT 3" not in system_names  # Different account
 
     def test_deactivate_and_reactivate_system(
-        self, system_under_test_factory, account_factory, engine: Engine
+        self,
+        system_under_test_factory,
+        account_factory,
+        auth_user_factory,
+        engine: Engine,
     ):
         """Test soft delete and reactivation."""
         # Arrange
-        account_id = account_factory()
-        sut_id = system_under_test_factory(account_id=account_id)
-        deactivated_by = "admin-user-456"
+        owner_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=owner_id)
+        sut_id = system_under_test_factory(account_id=account_id, owner_user_id=owner_id)
+        deactivated_by = auth_user_factory()
 
         # Act - Deactivate
         result = deactivate_system_under_test(sut_id, deactivated_by, engine)
 
         # Assert deactivated
         assert result is True
-        with session(engine) as db_session:
+        with session() as db_session:
             sut = query_system_under_test_by_id(sut_id, db_session, engine)
         assert sut.is_active is False
         assert sut.deactivated_by_user_id == deactivated_by
@@ -115,32 +138,40 @@ class TestSystemUnderTestCRUD:
 
         # Assert reactivated
         assert result is True
-        with session(engine) as db_session:
+        with session() as db_session:
             sut = query_system_under_test_by_id(sut_id, db_session, engine)
         assert sut.is_active is True
         assert sut.deactivated_at is None
         assert sut.deactivated_by_user_id is None
 
     def test_update_system(
-        self, system_under_test_factory, account_factory, engine: Engine
+        self,
+        system_under_test_factory,
+        account_factory,
+        auth_user_factory,
+        engine: Engine,
     ):
         """Test updating system fields."""
         # Arrange
-        account_id = account_factory()
-        sut_id = system_under_test_factory(account_id=account_id, name="Original Name")
+        owner_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=owner_id)
+        sut_id = system_under_test_factory(
+            account_id=account_id, owner_user_id=owner_id, name="Original Name"
+        )
 
         # Act
         updates = SystemUnderTestModel(
-            system_name="Updated Name", system_type="mobile_application"
+            system_name="Updated Name",
+            account_id=account_id,
+            owner_user_id=owner_id,
         )
         result = update_system_under_test(sut_id, updates, engine)
 
         # Assert
         assert result is True
-        with session(engine) as db_session:
+        with session() as db_session:
             sut = query_system_under_test_by_id(sut_id, db_session, engine)
         assert sut.system_name == "Updated Name"
-        assert sut.system_type == "mobile_application"
 
 
 class TestTestCaseCRUD:
@@ -151,26 +182,28 @@ class TestTestCaseCRUD:
         test_case_factory,
         system_under_test_factory,
         account_factory,
+        auth_user_factory,
         engine: Engine,
     ):
         """Test inserting test case with valid test_type enum."""
         # Arrange
-        account_id = account_factory()
-        sut_id = system_under_test_factory(account_id=account_id)
+        owner_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=owner_id)
+        sut_id = system_under_test_factory(account_id=account_id, owner_user_id=owner_id)
 
         test_case_model = TestCaseModel(
-            test_case_name="Login Test",
+            test_name="Login Test",
             test_type="functional",
             account_id=account_id,
             sut_id=sut_id,
-            created_by_user_id="test-user",
+            owner_user_id=owner_id,
         )
 
         # Act
         test_case_id = insert_test_case(test_case_model, engine)
 
         # Assert
-        with session(engine) as db_session:
+        with session() as db_session:
             retrieved = query_test_case_by_id(test_case_id, db_session, engine)
         assert retrieved.test_type == "functional"
 
@@ -179,60 +212,83 @@ class TestTestCaseCRUD:
         test_case_factory,
         system_under_test_factory,
         account_factory,
+        auth_user_factory,
         engine: Engine,
     ):
         """Test filtering test cases by type."""
         # Arrange
-        account_id = account_factory()
-        sut_id = system_under_test_factory(account_id=account_id)
+        owner_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=owner_id)
+        sut_id = system_under_test_factory(account_id=account_id, owner_user_id=owner_id)
 
         tc1 = test_case_factory(
-            account_id=account_id, sut_id=sut_id, name="Func Test", test_type="functional"
+            account_id=account_id,
+            sut_id=sut_id,
+            owner_user_id=owner_id,
+            name="Func Test",
+            test_type="functional",
         )
         tc2 = test_case_factory(
             account_id=account_id,
             sut_id=sut_id,
+            owner_user_id=owner_id,
             name="Perf Test",
             test_type="performance",
         )
         tc3 = test_case_factory(
-            account_id=account_id, sut_id=sut_id, name="Smoke Test", test_type="smoke"
+            account_id=account_id,
+            sut_id=sut_id,
+            owner_user_id=owner_id,
+            name="Smoke Test",
+            test_type="smoke",
         )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             functional_tests = query_test_cases_by_type(
                 "functional", account_id, db_session, engine
             )
 
         # Assert
         assert len(functional_tests) == 1
-        assert functional_tests[0].test_case_name == "Func Test"
+        assert functional_tests[0].test_name == "Func Test"
 
     def test_query_test_cases_by_sut(
         self,
         test_case_factory,
         system_under_test_factory,
         account_factory,
+        auth_user_factory,
         engine: Engine,
     ):
         """Test querying test cases for a specific system."""
         # Arrange
-        account_id = account_factory()
-        sut1 = system_under_test_factory(account_id=account_id, name="Web App")
-        sut2 = system_under_test_factory(account_id=account_id, name="Mobile App")
+        owner_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=owner_id)
+        sut1 = system_under_test_factory(
+            account_id=account_id, owner_user_id=owner_id, name="Web App"
+        )
+        sut2 = system_under_test_factory(
+            account_id=account_id, owner_user_id=owner_id, name="Mobile App"
+        )
 
-        tc1 = test_case_factory(account_id=account_id, sut_id=sut1, name="Web Test 1")
-        tc2 = test_case_factory(account_id=account_id, sut_id=sut1, name="Web Test 2")
-        tc3 = test_case_factory(account_id=account_id, sut_id=sut2, name="Mobile Test")
+        tc1 = test_case_factory(
+            account_id=account_id, sut_id=sut1, owner_user_id=owner_id, name="Web Test 1"
+        )
+        tc2 = test_case_factory(
+            account_id=account_id, sut_id=sut1, owner_user_id=owner_id, name="Web Test 2"
+        )
+        tc3 = test_case_factory(
+            account_id=account_id, sut_id=sut2, owner_user_id=owner_id, name="Mobile Test"
+        )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             web_tests = query_test_cases_by_sut(sut1, db_session, engine)
 
         # Assert
         assert len(web_tests) == 2
-        test_names = {t.test_case_name for t in web_tests}
+        test_names = {t.test_name for t in web_tests}
         assert "Web Test 1" in test_names
         assert "Mobile Test" not in test_names
 
@@ -240,41 +296,74 @@ class TestTestCaseCRUD:
 class TestSuiteCRUD:
     """Test Suite CRUD operations."""
 
-    def test_insert_and_query_suite(self, suite_factory, account_factory, engine: Engine):
+    def test_insert_and_query_suite(
+        self,
+        suite_factory,
+        system_under_test_factory,
+        account_factory,
+        auth_user_factory,
+        engine: Engine,
+    ):
         """Test creating and retrieving a suite."""
         # Arrange
-        account_id = account_factory()
+        owner_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=owner_id)
+        sut_id = system_under_test_factory(account_id=account_id, owner_user_id=owner_id)
 
         suite_model = SuiteModel(
             suite_name="Regression Suite",
-            suite_description="Full regression test suite",
+            description="Full regression test suite",
+            sut_id=sut_id,
             account_id=account_id,
-            created_by_user_id="test-lead",
+            owner_user_id=owner_id,
         )
 
         # Act
         suite_id = insert_suite(suite_model, engine)
 
         # Assert
-        with session(engine) as db_session:
+        with session() as db_session:
             retrieved = query_suite_by_id(suite_id, db_session, engine)
         assert retrieved.suite_name == "Regression Suite"
-        assert retrieved.suite_description == "Full regression test suite"
+        assert retrieved.description == "Full regression test suite"
 
     def test_query_suites_by_account_multi_tenant(
-        self, suite_factory, account_factory, engine: Engine
+        self,
+        suite_factory,
+        system_under_test_factory,
+        account_factory,
+        auth_user_factory,
+        engine: Engine,
     ):
         """Test multi-tenant isolation for suites."""
         # Arrange
-        account1 = account_factory(name="Company A")
-        account2 = account_factory(name="Company B")
+        owner_id = auth_user_factory()
+        account1 = account_factory(owner_user_id=owner_id, name="Company A")
+        account2 = account_factory(owner_user_id=owner_id, name="Company B")
+        sut1 = system_under_test_factory(account_id=account1, owner_user_id=owner_id)
+        sut2 = system_under_test_factory(account_id=account2, owner_user_id=owner_id)
 
-        suite1 = suite_factory(account_id=account1, name="Company A Suite 1")
-        suite2 = suite_factory(account_id=account1, name="Company A Suite 2")
-        suite3 = suite_factory(account_id=account2, name="Company B Suite")
+        suite1 = suite_factory(
+            account_id=account1,
+            sut_id=sut1,
+            owner_user_id=owner_id,
+            name="Company A Suite 1",
+        )
+        suite2 = suite_factory(
+            account_id=account1,
+            sut_id=sut1,
+            owner_user_id=owner_id,
+            name="Company A Suite 2",
+        )
+        suite3 = suite_factory(
+            account_id=account2,
+            sut_id=sut2,
+            owner_user_id=owner_id,
+            name="Company B Suite",
+        )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             account1_suites = query_suites_by_account(account1, db_session, engine)
 
         # Assert
@@ -307,10 +396,18 @@ class TestValidationConfiguration:
             else:
                 os.environ.pop("FTS_VALIDATE_WRITES", None)
 
-    def test_bulk_insert_with_validation_disabled(self, account_factory, engine: Engine):
+    def test_bulk_insert_with_validation_disabled(
+        self,
+        account_factory,
+        auth_user_factory,
+        system_under_test_factory,
+        engine: Engine,
+    ):
         """Test bulk insert performance with validation disabled."""
         # Arrange
-        account_id = account_factory()
+        owner_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=owner_id)
+        sut_id = system_under_test_factory(account_id=account_id, owner_user_id=owner_id)
 
         # Set environment to disable write validation
         original_write = os.environ.get("FTS_VALIDATE_WRITES")
@@ -321,11 +418,11 @@ class TestValidationConfiguration:
             test_cases = []
             for i in range(10):
                 tc_model = TestCaseModel(
-                    test_case_name=f"Bulk Test {i}",
+                    test_name=f"Bulk Test {i}",
                     test_type="functional",
                     account_id=account_id,
-                    sut_id=account_id,  # Using account_id as placeholder
-                    created_by_user_id="bulk-user",
+                    sut_id=sut_id,
+                    owner_user_id=owner_id,
                 )
                 tc_id = insert_test_case(tc_model, engine)
                 test_cases.append(tc_id)

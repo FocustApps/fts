@@ -15,6 +15,9 @@ from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.database import TestCaseTable
 from common.service_connections.db_service.database.enums import TestTypeEnum
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.config import should_validate_write
 
 
@@ -82,10 +85,12 @@ class TestCaseModel(BaseModel):
 ################ Test Case CRUD Operations ################
 
 
-def insert_test_case(
-    test_case: TestCaseModel, session: Session, engine: Engine
-) -> TestCaseModel:
-    """Create a new test case in the database."""
+def insert_test_case(test_case: TestCaseModel, engine: Engine) -> str:
+    """Create a new test case in the database.
+
+    Returns:
+        test_case_id (str): The ID of the created test case
+    """
     if test_case.test_case_id:
         test_case.test_case_id = None
         logging.warning("Test Case ID will only be set by the system")
@@ -96,22 +101,22 @@ def insert_test_case(
         db_session.add(db_test_case)
         db_session.commit()
         db_session.refresh(db_test_case)
+        test_case_id = db_test_case.test_case_id
 
-    return TestCaseModel(**db_test_case.__dict__)
+    return test_case_id
 
 
 def query_test_case_by_id(
     test_case_id: str, session: Session, engine: Engine
 ) -> TestCaseModel:
     """Retrieve a test case by ID."""
-    with session() as db_session:
-        db_test_case = (
-            db_session.query(TestCaseTable)
-            .filter(TestCaseTable.test_case_id == test_case_id)
-            .first()
-        )
-        if not db_test_case:
-            raise ValueError(f"Test Case ID {test_case_id} not found.")
+    db_test_case = (
+        session.query(TestCaseTable)
+        .filter(TestCaseTable.test_case_id == test_case_id)
+        .first()
+    )
+    if not db_test_case:
+        raise ValueError(f"Test Case ID {test_case_id} not found.")
 
     return TestCaseModel(**db_test_case.__dict__)
 
@@ -165,14 +170,13 @@ def query_test_cases_by_account(
     account_id: str, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
     """Query active test cases filtered by account_id."""
-    with session() as db_session:
-        test_cases = (
-            db_session.query(TestCaseTable)
-            .filter(TestCaseTable.account_id == account_id)
-            .filter(TestCaseTable.is_active == True)
-            .all()
-        )
-        return [TestCaseModel(**tc.__dict__) for tc in test_cases]
+    test_cases = (
+        session.query(TestCaseTable)
+        .filter(TestCaseTable.account_id == account_id)
+        .filter(TestCaseTable.is_active == True)
+        .all()
+    )
+    return [TestCaseModel(**tc.__dict__) for tc in test_cases]
 
 
 def query_test_cases_by_owner(
@@ -193,28 +197,27 @@ def query_test_cases_by_sut(
     sut_id: str, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
     """Query active test cases for a specific system under test."""
-    with session() as db_session:
-        test_cases = (
-            db_session.query(TestCaseTable)
-            .filter(TestCaseTable.sut_id == sut_id)
-            .filter(TestCaseTable.is_active == True)
-            .all()
-        )
-        return [TestCaseModel(**tc.__dict__) for tc in test_cases]
+    test_cases = (
+        session.query(TestCaseTable)
+        .filter(TestCaseTable.sut_id == sut_id)
+        .filter(TestCaseTable.is_active == True)
+        .all()
+    )
+    return [TestCaseModel(**tc.__dict__) for tc in test_cases]
 
 
 def query_test_cases_by_type(
-    test_type: str, session: Session, engine: Engine
+    test_type: str, account_id: str, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
-    """Query active test cases filtered by test type."""
-    with session() as db_session:
-        test_cases = (
-            db_session.query(TestCaseTable)
-            .filter(TestCaseTable.test_type == test_type)
-            .filter(TestCaseTable.is_active == True)
-            .all()
-        )
-        return [TestCaseModel(**tc.__dict__) for tc in test_cases]
+    """Query active test cases filtered by test type and account."""
+    test_cases = (
+        session.query(TestCaseTable)
+        .filter(TestCaseTable.test_type == test_type)
+        .filter(TestCaseTable.account_id == account_id)
+        .filter(TestCaseTable.is_active == True)
+        .all()
+    )
+    return [TestCaseModel(**tc.__dict__) for tc in test_cases]
 
 
 def deactivate_test_case_by_id(

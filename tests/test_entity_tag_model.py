@@ -12,6 +12,9 @@ import threading
 import pytest
 from sqlalchemy.engine import Engine
 
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.service_connections.db_service.models.entity_tag_model import (
     AccountRLSContext,
     query_entity_tag_by_id,
@@ -62,12 +65,12 @@ class TestPolymorphicTagging:
         )
 
         # Assert - Query entities by tag
-        with session(engine) as db_session:
+        with session() as db_session:
             suite_entities = query_entities_by_tag(
                 tag_name="high",
                 entity_type="suite",
                 account_id=account_id,
-                session=db_session,
+                db_session=db_session,
                 engine=engine,
             )
 
@@ -75,7 +78,7 @@ class TestPolymorphicTagging:
                 tag_name="high",
                 entity_type="test_case",
                 account_id=account_id,
-                session=db_session,
+                db_session=db_session,
                 engine=engine,
             )
 
@@ -116,12 +119,12 @@ class TestPolymorphicTagging:
         )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             tags = query_tags_for_entity(
                 entity_type="suite",
                 entity_id=suite_id,
                 account_id=account_id,
-                session=db_session,
+                db_session=db_session,
                 engine=engine,
             )
 
@@ -164,11 +167,11 @@ class TestPolymorphicTagging:
         )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             priority_tags = query_tags_by_category(
                 tag_category="priority",
                 account_id=account_id,
-                session=db_session,
+                db_session=db_session,
                 engine=engine,
             )
 
@@ -213,9 +216,9 @@ class TestPolymorphicTagging:
         )
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             unique_names = query_unique_tag_names(
-                account_id=account_id, session=db_session, engine=engine
+                account_id=account_id, db_session=db_session, engine=engine
             )
 
         # Assert - Should only have 2 unique names despite 3 tags
@@ -228,11 +231,12 @@ class TestBulkTagOperations:
     """Test bulk tag operations."""
 
     def test_add_multiple_tags_to_entity(
-        self, suite_factory, account_factory, engine: Engine
+        self, suite_factory, account_factory, auth_user_factory, engine: Engine
     ):
         """Test adding multiple tags in single transaction."""
         # Arrange
-        account_id = account_factory()
+        user_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=user_id)
         suite_id = suite_factory(account_id=account_id)
 
         tag_names = ["tag1", "tag2", "tag3"]
@@ -244,29 +248,32 @@ class TestBulkTagOperations:
             tag_names=tag_names,
             tag_category="test_category",
             account_id=account_id,
-            created_by_user_id="bulk-user",
+            created_by_user_id=user_id,
             engine=engine,
         )
 
         # Assert
         assert len(tag_ids) == 3
 
-        with session(engine) as db_session:
+        with session() as db_session:
             tags = query_tags_for_entity(
                 entity_type="suite",
                 entity_id=suite_id,
                 account_id=account_id,
-                session=db_session,
+                db_session=db_session,
                 engine=engine,
             )
 
         retrieved_names = {tag.tag_name for tag in tags}
         assert retrieved_names == set(tag_names)
 
-    def test_replace_entity_tags(self, suite_factory, account_factory, engine: Engine):
+    def test_replace_entity_tags(
+        self, suite_factory, account_factory, auth_user_factory, engine: Engine
+    ):
         """Test replacing all tags on an entity."""
         # Arrange
-        account_id = account_factory()
+        user_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=user_id)
         suite_id = suite_factory(account_id=account_id)
 
         # Add initial tags
@@ -276,7 +283,7 @@ class TestBulkTagOperations:
             tag_names=["old1", "old2"],
             tag_category="labels",
             account_id=account_id,
-            created_by_user_id="user1",
+            created_by_user_id=user_id,
             engine=engine,
         )
 
@@ -287,8 +294,8 @@ class TestBulkTagOperations:
             new_tag_names=["new1", "new2", "new3"],
             tag_category="labels",
             account_id=account_id,
-            created_by_user_id="user1",
-            deactivated_by_user_id="user1",
+            created_by_user_id=user_id,
+            deactivated_by_user_id=user_id,
             engine=engine,
         )
 
@@ -296,12 +303,12 @@ class TestBulkTagOperations:
         assert len(result["deactivated"]) == 2
         assert len(result["created"]) == 3
 
-        with session(engine) as db_session:
+        with session() as db_session:
             active_tags = query_tags_for_entity(
                 entity_type="suite",
                 entity_id=suite_id,
                 account_id=account_id,
-                session=db_session,
+                db_session=db_session,
                 engine=engine,
                 active_only=True,
             )
@@ -319,7 +326,7 @@ class TestAccountRLSContext:
         account_id = "test-account-123"
 
         # Act & Assert - Context should not raise errors
-        with session(engine) as db_session:
+        with session() as db_session:
             with AccountRLSContext(db_session, account_id=account_id):
                 # Inside context, session variable is set
                 # In production, this would filter queries
@@ -333,7 +340,7 @@ class TestAccountRLSContext:
         account2 = "account-2"
 
         # Act & Assert - Nested contexts should work
-        with session(engine) as db_session:
+        with session() as db_session:
             with AccountRLSContext(db_session, account_id=account1):
                 # Inner context
                 with AccountRLSContext(db_session, account_id=account2):
@@ -348,7 +355,7 @@ class TestAccountRLSContext:
         max_depth = AccountRLSContext.MAX_STACK_DEPTH
 
         # Act & Assert - Should raise RuntimeError at depth limit
-        with session(engine) as db_session:
+        with session() as db_session:
             with pytest.raises(RuntimeError, match="Maximum RLS context depth"):
                 # Try to nest beyond limit
                 def nest_contexts(depth):
@@ -367,7 +374,7 @@ class TestAccountRLSContext:
         def thread_func(thread_id, account_id):
             """Function to run in separate thread."""
             try:
-                with session(engine) as db_session:
+                with session() as db_session:
                     with AccountRLSContext(db_session, account_id=account_id):
                         # Each thread should have independent stack
                         results[thread_id] = "success"
@@ -393,11 +400,17 @@ class TestTagSoftDelete:
     """Test soft delete operations for tags."""
 
     def test_deactivate_tag(
-        self, entity_tag_factory, suite_factory, account_factory, engine: Engine
+        self,
+        entity_tag_factory,
+        suite_factory,
+        account_factory,
+        auth_user_factory,
+        engine: Engine,
     ):
         """Test soft deleting a tag."""
         # Arrange
-        account_id = account_factory()
+        user_id = auth_user_factory()
+        account_id = account_factory(owner_user_id=user_id)
         suite_id = suite_factory(account_id=account_id)
 
         tag_id = entity_tag_factory(
@@ -410,15 +423,15 @@ class TestTagSoftDelete:
 
         # Act
         result = deactivate_entity_tag(
-            tag_id=tag_id, deactivated_by_user_id="admin-user", engine=engine
+            tag_id=tag_id, deactivated_by_user_id=user_id, engine=engine
         )
 
         # Assert
         assert result is True
 
-        with session(engine) as db_session:
+        with session() as db_session:
             tag = query_entity_tag_by_id(tag_id, db_session, engine)
 
         assert tag.is_active is False
-        assert tag.deactivated_by_user_id == "admin-user"
+        assert tag.deactivated_by_user_id == user_id
         assert tag.deactivated_at is not None

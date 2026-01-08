@@ -85,7 +85,7 @@ async def seed_admin_user():
             print(f"   Email: {user.email}")
             print(f"   Username: {user.username}")
             print(f"   Admin: {user.is_admin}")
-            print(f"   ID: {user.id}")
+            print(f"   ID: {user.auth_user_id}")
             print(f"� Use the token generator script to get authentication tokens")
 
             return True
@@ -97,9 +97,12 @@ async def seed_admin_user():
                 # Generate a new token for existing user (but don't send email)
                 try:
                     token = await auth_service.generate_user_token(
-                        admin_email, send_email=False  # Don't send email - use token generator script instead
+                        admin_email,
+                        send_email=False,  # Don't send email - use token generator script instead
                     )
-                    print(f"� User exists. Use the token generator script to get authentication tokens")
+                    print(
+                        f"� User exists. Use the token generator script to get authentication tokens"
+                    )
                     return True
                 except Exception as token_error:
                     print(f"❌ Error generating new token: {token_error}")
@@ -121,12 +124,12 @@ async def main():
     success = await seed_admin_user()
 
     if success:
-        print(
-            "\n🎉 Setup complete! Admin user is ready."
-        )
+        print("\n🎉 Setup complete! Admin user is ready.")
         print("� Check your email for the authentication token.")
         print("�💡 You can also use the token generator script if needed:")
-        print("    docker exec fts-fenrir-1 python /fenrir/app/scripts/get_multiuser_token.py")
+        print(
+            "    docker exec fts-fenrir-1 python /fenrir/app/scripts/get_multiuser_token.py"
+        )
     else:
         print("\n❌ Setup failed. Please check the errors above.")
         sys.exit(1)

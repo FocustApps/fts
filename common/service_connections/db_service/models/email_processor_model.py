@@ -6,18 +6,40 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 # Import centralized database components
-from common.service_connections.db_service.database import EmailProcessorTable, SystemEnum
+from common.service_connections.db_service.database import EmailProcessorTable
+from common.service_connections.db_service.database.enums import SystemEnum
+
+# Re-export SystemEnum for backward compatibility
+__all__ = ["EmailProcessorModel", "SystemEnum"]
 
 
 class EmailProcessorModel(BaseModel):
-    id: int | None = None
+    """
+    Schema for email processor records.
+    Fields match EmailProcessorTable database schema.
+
+    Fields:
+    - email_processor_id: int | None - Primary key
+    - email_item_id: int - Unique email item identifier
+    - multi_item_email_ids: List | None - JSONB list of multiple email IDs
+    - multi_email_flag: bool - Flag for multiple emails
+    - multi_attachment_flag: bool - Flag for multiple attachments
+    - system: str | None - System name
+    - test_name: str | None - Test case name
+    - requires_processing: bool - Processing flag
+    - created_at: datetime | None - Creation timestamp
+    - updated_at: datetime | None - Update timestamp
+    - last_processed_at: datetime | None - Last processing timestamp
+    """
+
+    email_processor_id: int | None = None
     email_item_id: int
     multi_item_email_ids: List | None = None
     multi_email_flag: bool = False
     multi_attachment_flag: bool = False
+    system: str | None = None
     test_name: str | None = None
     requires_processing: bool = False
-    system: SystemEnum | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     last_processed_at: datetime | None = None

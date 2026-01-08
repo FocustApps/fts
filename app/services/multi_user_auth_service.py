@@ -149,7 +149,7 @@ class MultiUserAuthService:
                 insert_auth_user, auth_user=new_auth_user
             )
 
-            logger.info(f"Added new user: {email} (ID: {created_user.id})")
+            logger.info(f"Added new user: {email} (ID: {created_user.auth_user_id})")
 
             # Send welcome email with initial token if requested
             if send_welcome_email:
@@ -208,7 +208,7 @@ class MultiUserAuthService:
             user.updated_at = datetime.now(timezone.utc)
 
             self._execute_auth_model_function(
-                update_auth_user_by_id, user_id=user.id, auth_user=user
+                update_auth_user_by_id, user_id=user.auth_user_id, auth_user=user
             )
 
             logger.info(f"Generated new token for user: {email}")
@@ -303,7 +303,7 @@ class MultiUserAuthService:
                 user.last_login_at = datetime.now(timezone.utc)
                 user.updated_at = datetime.now(timezone.utc)
                 self._execute_auth_model_function(
-                    update_auth_user_by_id, user_id=user.id, auth_user=user
+                    update_auth_user_by_id, user_id=user.auth_user_id, auth_user=user
                 )
 
                 logger.debug(f"Token validated successfully for user: {email}")
@@ -390,7 +390,9 @@ class MultiUserAuthService:
                 return False
 
             # Deactivate user using auth_user_model function
-            self._execute_auth_model_function(deactivate_auth_user, user_id=user.id)
+            self._execute_auth_model_function(
+                deactivate_auth_user, user_id=user.auth_user_id
+            )
 
             logger.info(f"Deactivated user: {email}")
             return True
@@ -447,7 +449,7 @@ class MultiUserAuthService:
                     user.updated_at = current_time
 
                     self._execute_auth_model_function(
-                        update_auth_user_by_id, user_id=user.id, auth_user=user
+                        update_auth_user_by_id, user_id=user.auth_user_id, auth_user=user
                     )
                     count += 1
 
@@ -498,7 +500,7 @@ class MultiUserAuthService:
             user.updated_at = datetime.now(timezone.utc)
 
             self._execute_auth_model_function(
-                update_auth_user_by_id, user_id=user.id, auth_user=user
+                update_auth_user_by_id, user_id=user.auth_user_id, auth_user=user
             )
 
             logger.info(f"Token invalidated for user {email}")
@@ -536,7 +538,7 @@ class MultiUserAuthService:
             user.updated_at = datetime.now(timezone.utc)
 
             self._execute_auth_model_function(
-                update_auth_user_by_id, user_id=user.id, auth_user=user
+                update_auth_user_by_id, user_id=user.auth_user_id, auth_user=user
             )
 
             logger.info(f"All tokens invalidated for user {email}")

@@ -59,7 +59,7 @@ class AuthTokenTable(Base):
     )
     auth_user_id: Mapped[str] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.id", ondelete="CASCADE"),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="CASCADE"),
         nullable=False,
     )
     token_value: Mapped[str] = mapped_column(sql.String(64), unique=True, nullable=False)

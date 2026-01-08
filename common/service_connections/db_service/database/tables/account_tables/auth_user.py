@@ -4,6 +4,7 @@ Auth user table model for system access control.
 
 from datetime import datetime, timezone
 from typing import Optional, List, TYPE_CHECKING
+from uuid import uuid4
 
 import sqlalchemy as sql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -55,7 +56,9 @@ class AuthUserTable(Base):
 
     __tablename__ = "auth_users"
 
-    id: Mapped[int] = mapped_column(sql.Integer, primary_key=True, autoincrement=True)
+    auth_user_id: Mapped[str] = mapped_column(
+        sql.String(36), primary_key=True, default=lambda: str(uuid4())
+    )
     email: Mapped[str] = mapped_column(sql.String(255), unique=True, nullable=False)
     username: Mapped[Optional[str]] = mapped_column(sql.String(96))
     first_name: Mapped[Optional[str]] = mapped_column(sql.String(255))
@@ -95,9 +98,7 @@ class AuthUserTable(Base):
     # )
 
     def __repr__(self) -> str:
-        return (
-            f"<AuthUser(id={self.id}, email='{self.email}', is_active={self.is_active})>"
-        )
+        return f"<AuthUser(auth_user_id={self.auth_user_id}, email='{self.email}', is_active={self.is_active})>"
 
     def is_token_valid(self) -> bool:
         """Check if the current token is valid and not expired."""

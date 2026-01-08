@@ -19,26 +19,31 @@ from common.service_connections.db_service.database import IdentifierTable
 class IdentifierModel(BaseModel):
     """
     IdentifierModel is a Pydantic model that represents an identifier for a web element.
+    Fields match IdentifierTable database schema.
 
     Fields:
-    - id (int): The unique identifier for the model.
+    - identifier_id (int): The unique identifier for the model.
     - page_id (int): The identifier for the page to which the element belongs.
     - element_name (str): The name of the web element.
-    - created_at (datetime): The timestamp when the identifier was created.
     - locator_strategy (str): The strategy used to locate the web element (e.g., CSS selector, XPath, ID, etc.).
     - locator_query (str): The query used to locate the web element.
-    - action (Optional[str]): The action to be performed on the element (e.g., click, type, hover).
-    - environments (List): A list of environments where the identifier is applicable.
+    - is_active (bool): Soft delete flag
+    - deactivated_at (datetime | None): Soft delete timestamp
+    - deactivated_by_user_id (str | None): Who deactivated
+    - created_at (datetime): The timestamp when the identifier was created.
+    - updated_at (datetime): The timestamp when the identifier was updated.
     """
 
-    id: Optional[int] = None
+    identifier_id: Optional[int] = None
     page_id: int
     element_name: str
-    created_at: Optional[datetime] = None
     locator_strategy: str
     locator_query: str
-    action: Optional[str] = None
-    environments: List
+    is_active: bool = True
+    deactivated_at: Optional[datetime] = None
+    deactivated_by_user_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 ################ Identifier Queries ################

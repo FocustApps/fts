@@ -24,25 +24,31 @@ from common.service_connections.db_service.models.identifier_model import Identi
 class PageModel(BaseModel):
     """
     PageModel represents a page with its metadata and environments.
+    Fields match PageTable database schema.
 
     Fields:
-    - id (int): The unique identifier for the page.
+    - page_id (int): The unique identifier for the page.
     - page_name (str): The name of the page.
     - page_url (str): The URL of the page.
-    - created_at (str): The creation timestamp of the page.
+    - environments (dict): JSONB dict of environment configurations
+    - is_active (bool): Soft delete flag
+    - deactivated_at (datetime | None): Soft delete timestamp
+    - deactivated_by_user_id (str | None): Who deactivated
+    - created_at (datetime): The creation timestamp of the page.
+    - updated_at (datetime): The update timestamp of the page.
     - identifiers (List[IdentifierModel]): A list of identifiers associated with the page.
-    - environments (List[str]): A list of environment names where the page is used.
-
-    Properties:
-    - useable_environments (List[EnvironmentEnum]): A list of EnvironmentEnum values derived from the environments attribute.
     """
 
-    id: Optional[int] = None
+    page_id: Optional[int] = None
     page_name: str
     page_url: str
-    created_at: datetime
+    environments: dict = {}
+    is_active: bool = True
+    deactivated_at: Optional[datetime] = None
+    deactivated_by_user_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     identifiers: List[IdentifierModel] = []
-    environments: List[str]
 
     @property
     def useable_environments(self) -> List[EnvironmentEnum]:

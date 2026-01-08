@@ -17,26 +17,35 @@ from common.service_connections.db_service.models.user_model import UserModel
 class EnvironmentModel(BaseModel):
     """
     Schema for representing an environment.
+    Fields match EnvironmentTable database schema.
 
     Fields:
-    - name: str | None, the name of the environment.
-    - environment_designation: EnvironmentEnum | None, the designation of the environment.
-    - url: str | None, the URL of the environment.
-    - status: bool | None, the status of the environment.
-    - users: List[UserSchema] | None, the list of users associated with the environment.
-    - created_at: str | None, the creation date of the environment.
-    - updated_at: str | None, the update date of the environment.
+    - environment_id: str | None - UUID primary key
+    - environment_name: str | None - Unique environment name
+    - environment_designation: str | None - Environment designation (dev, qa, staging, prod)
+    - environment_base_url: str | None - Base URL for the environment
+    - api_base_url: str | None - API base URL
+    - environment_status: str | None - Environment status
+    - users_in_environment: List | None - JSONB list of users
+    - is_active: bool - Soft delete flag
+    - deactivated_at: datetime | None - Soft delete timestamp
+    - deactivated_by_user_id: str | None - Who deactivated
+    - created_at: datetime | None - Creation timestamp
+    - updated_at: datetime | None - Update timestamp
     """
 
-    id: int | None = None
-    name: str | None = None
+    environment_id: str | None = None
+    environment_name: str | None = None
     environment_designation: str | None = None
-    url: str | None = None
-    api_url: str | None = None
-    status: bool | None = None
+    environment_base_url: str | None = None
+    api_base_url: str | None = None
+    environment_status: str | None = None
+    users_in_environment: List | None = None
+    is_active: bool = True
+    deactivated_at: datetime | None = None
+    deactivated_by_user_id: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    users: List | None = None
 
 
 ############# Environment Queries #############

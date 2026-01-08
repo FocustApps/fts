@@ -12,9 +12,9 @@ import os
 from pathlib import Path
 
 # Add the project root to the path (works both inside container and locally)
-if os.path.exists('/fenrir'):
+if os.path.exists("/fenrir"):
     # Inside container
-    project_root = Path('/fenrir')
+    project_root = Path("/fenrir")
 else:
     # Local development
     project_root = Path(__file__).parent.parent
@@ -53,7 +53,7 @@ async def generate_admin_token():
                 return None
 
             print(
-                f"✅ Found user: {user.username} (ID: {user.id}, Admin: {user.is_admin})"
+                f"✅ Found user: {user.username} (ID: {user.auth_user_id}, Admin: {user.is_admin})"
             )
 
         except Exception as e:
@@ -70,15 +70,16 @@ async def generate_admin_token():
             if token:
                 print(f"🎯 WORKING TOKEN: {token}")
                 print()
-                
+
                 # Test the token immediately to verify it works
                 import requests
+
                 try:
                     print("🧪 Testing token validity...")
                     response = requests.get(
-                        'http://localhost:8080/v1/env/api/', 
-                        headers={'X-Auth-Token': token},
-                        timeout=5
+                        "http://localhost:8080/v1/env/api/",
+                        headers={"X-Auth-Token": token},
+                        timeout=5,
                     )
                     if response.status_code == 200:
                         print("✅ TOKEN VERIFIED - This token works!")
@@ -86,10 +87,10 @@ async def generate_admin_token():
                     else:
                         print(f"❌ Token test failed: {response.status_code}")
                         print(f"Response: {response.text[:100]}")
-                        
+
                 except Exception as e:
                     print(f"❌ Token test error: {e}")
-                
+
                 print()
                 print("=" * 60)
                 print("� SUCCESS: Use this token for all API calls and web login:")
@@ -98,7 +99,9 @@ async def generate_admin_token():
                 print("=" * 60)
                 print()
                 print("💡 Usage examples:")
-                print(f"  curl -H 'X-Auth-Token: {token}' http://localhost:8080/v1/env/api/")
+                print(
+                    f"  curl -H 'X-Auth-Token: {token}' http://localhost:8080/v1/env/api/"
+                )
                 print()
                 print("📝 This token works with endpoints like:")
                 print("  - /v1/env/api/ (environments)")

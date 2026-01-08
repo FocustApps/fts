@@ -15,6 +15,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.models.action_chain_model import (
+    ActionChainModel,
     ActionStepModel,
     ActionReferenceCache,
     query_action_chain_by_id,
@@ -67,7 +68,7 @@ class TestActionChainJSONB:
         )
 
         # Assert
-        with session(engine) as db_session:
+        with session() as db_session:
             retrieved = query_action_chain_by_id(chain_id, db_session, engine)
 
         assert retrieved is not None
@@ -102,26 +103,28 @@ class TestActionChainJSONB:
             account_id=account_id, sut_id=sut_id, action_steps=initial_steps
         )
 
-        new_step = {
-            "step_name": "Step 2",
-            "action_type": "api_action",
-            "action_id": "action-2",
-            "depends_on": ["Step 1"],
-            "parallel": False,
-        }
+        new_step = ActionStepModel(
+            step_name="Step 2",
+            action_type="api_action",
+            action_id="action-2",
+            depends_on=["Step 1"],
+            parallel=False,
+        )
 
         # Act
         result = add_step_to_chain(
             action_chain_id=chain_id,
-            new_step=new_step,
+            step=new_step,
             engine=engine,
             position=-1,  # Append to end
         )
 
         # Assert
-        assert result is True
+        assert result is not None
+        assert isinstance(result, ActionChainModel)
+        assert len(result.action_steps) == 2
 
-        with session(engine) as db_session:
+        with session() as db_session:
             updated = query_action_chain_by_id(chain_id, db_session, engine)
 
         assert len(updated.action_steps) == 2
@@ -175,9 +178,9 @@ class TestActionChainJSONB:
         )
 
         # Assert
-        assert result is True
+        assert result is not None
 
-        with session(engine) as db_session:
+        with session() as db_session:
             updated = query_action_chain_by_id(chain_id, db_session, engine)
 
         assert len(updated.action_steps) == 2
@@ -224,9 +227,9 @@ class TestActionChainJSONB:
         )
 
         # Assert
-        assert result is True
+        assert result is not None
 
-        with session(engine) as db_session:
+        with session() as db_session:
             updated = query_action_chain_by_id(chain_id, db_session, engine)
 
         assert updated.action_steps[0]["action_id"] == "updated-action"
@@ -281,9 +284,9 @@ class TestActionChainJSONB:
         )
 
         # Assert
-        assert result is True
+        assert result is not None
 
-        with session(engine) as db_session:
+        with session() as db_session:
             updated = query_action_chain_by_id(chain_id, db_session, engine)
 
         step_names = [s["step_name"] for s in updated.action_steps]

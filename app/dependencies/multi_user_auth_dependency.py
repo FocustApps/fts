@@ -175,7 +175,7 @@ async def _validate_multi_user_token(
                     return AuthContext(
                         token=token,
                         user_email=user.email,
-                        user_id=user.id,
+                        user_id=user.auth_user_id,
                         username=user.username,
                         is_admin=user.is_admin,
                     )
@@ -192,7 +192,7 @@ async def _validate_multi_user_token(
                 return AuthContext(
                     token=token,
                     user_email=user.email,
-                    user_id=user.id,
+                    user_id=user.auth_user_id,
                     username=user.username,
                     is_admin=user.is_admin,
                 )

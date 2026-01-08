@@ -14,6 +14,9 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.database import SuiteTable
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.config import should_validate_write
 
 
@@ -65,8 +68,12 @@ class SuiteModel(BaseModel):
 ################ Suite CRUD Operations ################
 
 
-def insert_suite(suite: SuiteModel, session: Session, engine: Engine) -> SuiteModel:
-    """Create a new suite in the database."""
+def insert_suite(suite: SuiteModel, engine: Engine) -> str:
+    """Create a new suite in the database.
+
+    Returns:
+        suite_id (str): The ID of the created suite
+    """
     if suite.suite_id:
         suite.suite_id = None
         logging.warning("Suite ID will only be set by the system")
@@ -77,18 +84,16 @@ def insert_suite(suite: SuiteModel, session: Session, engine: Engine) -> SuiteMo
         db_session.add(db_suite)
         db_session.commit()
         db_session.refresh(db_suite)
+        suite_id = db_suite.suite_id
 
-    return SuiteModel(**db_suite.__dict__)
+    return suite_id
 
 
 def query_suite_by_id(suite_id: str, session: Session, engine: Engine) -> SuiteModel:
     """Retrieve a suite by ID."""
-    with session() as db_session:
-        db_suite = (
-            db_session.query(SuiteTable).filter(SuiteTable.suite_id == suite_id).first()
-        )
-        if not db_suite:
-            raise ValueError(f"Suite ID {suite_id} not found.")
+    db_suite = session.query(SuiteTable).filter(SuiteTable.suite_id == suite_id).first()
+    if not db_suite:
+        raise ValueError(f"Suite ID {suite_id} not found.")
 
     return SuiteModel(**db_suite.__dict__)
 
@@ -140,14 +145,13 @@ def query_suites_by_account(
     account_id: str, session: Session, engine: Engine
 ) -> List[SuiteModel]:
     """Query active suites filtered by account_id."""
-    with session() as db_session:
-        suites = (
-            db_session.query(SuiteTable)
-            .filter(SuiteTable.account_id == account_id)
-            .filter(SuiteTable.is_active == True)
-            .all()
-        )
-        return [SuiteModel(**suite.__dict__) for suite in suites]
+    suites = (
+        session.query(SuiteTable)
+        .filter(SuiteTable.account_id == account_id)
+        .filter(SuiteTable.is_active == True)
+        .all()
+    )
+    return [SuiteModel(**suite.__dict__) for suite in suites]
 
 
 def query_suites_by_owner(

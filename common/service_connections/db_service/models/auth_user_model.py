@@ -10,15 +10,23 @@ from common.service_connections.db_service.database import AuthUserTable
 class AuthUserModel(BaseModel):
     """
     Schema for representing an authenticated user.
+
+    Fields match AuthUserTable database schema.
     """
 
-    id: int | None = None
+    auth_user_id: str | None = None
     email: str | None = None
     username: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     current_token: str | None = None
     token_expires_at: datetime | None = None
     is_active: bool = True
     is_admin: bool = False
+    is_super_admin: bool = False
+    multi_account_user: bool = False
+    account_ids: str | None = None  # DEPRECATED: Use accounts relationship instead
+    user_subscription_id: str | None = None
     created_at: datetime = datetime.now(tz=timezone.utc)
     last_login_at: datetime | None = None
     updated_at: datetime | None = None
@@ -29,8 +37,8 @@ def insert_auth_user(auth_user: AuthUserModel, session: Session, engine) -> Auth
     Placeholder function for inserting an authenticated user.
     In a real implementation, this would interact with a database.
     """
-    if auth_user.id:
-        auth_user.id = None
+    if auth_user.auth_user_id:
+        auth_user.auth_user_id = None
         logging.warning("AuthUser ID will only be set by the system")
     with session() as session:
         auth_user.created_at = datetime.now()

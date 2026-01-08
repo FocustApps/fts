@@ -81,7 +81,7 @@ class UserResponse(BaseModel):
     def from_auth_user(cls, user: AuthUserModel) -> "UserResponse":
         """Convert AuthUserModel to API response model."""
         return cls(
-            id=user.id,
+            id=user.auth_user_id,
             email=user.email,
             username=user.username,
             is_admin=user.is_admin,
@@ -111,7 +111,7 @@ async def get_auth_users_view(
         for user in users:
             # Create display object with clean field names
             user_display = AuthUserDisplay(
-                id=user.id,
+                id=user.auth_user_id,
                 email=user.email,
                 username=user.username or "—",
                 is_admin="✓" if user.is_admin else "—",
@@ -184,7 +184,7 @@ async def view_auth_user(
 
         # Convert user to dict and mask sensitive data (similar to users.py pattern)
         user_dict = {
-            "id": user.id,
+            "id": user.auth_user_id,
             "email": user.email,
             "username": user.username or "—",
             "is_admin": "Yes" if user.is_admin else "No",
@@ -279,7 +279,7 @@ async def create_auth_user_view(
             send_welcome_email=True,  # Send welcome email with token
         )
 
-        logger.info(f"Created new auth user: {email} (ID: {new_user.id})")
+        logger.info(f"Created new auth user: {email} (ID: {new_user.auth_user_id})")
 
         return """
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -288,7 +288,7 @@ async def create_auth_user_view(
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         """.format(
-            new_user.id
+            new_user.auth_user_id
         )
 
     except MultiUserAuthError as e:
@@ -320,7 +320,7 @@ async def generate_token_view(
         auth_service = get_multi_user_auth_service()
         users = auth_service.list_users(include_inactive=True)
 
-        user = next((u for u in users if u.id == user_id), None)
+        user = next((u for u in users if u.auth_user_id == user_id), None)
         if not user:
             return """
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -369,7 +369,7 @@ async def deactivate_auth_user_view(
         auth_service = get_multi_user_auth_service()
         users = auth_service.list_users(include_inactive=True)
 
-        user = next((u for u in users if u.id == record_id), None)
+        user = next((u for u in users if u.auth_user_id == record_id), None)
         if not user:
             return """
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -434,7 +434,7 @@ async def get_user_api(
         auth_service = get_multi_user_auth_service()
         users = auth_service.list_users(include_inactive=True)
 
-        user = next((u for u in users if u.id == user_id), None)
+        user = next((u for u in users if u.auth_user_id == user_id), None)
         if not user:
             raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -485,7 +485,7 @@ async def generate_token_api(
         auth_service = get_multi_user_auth_service()
         users = auth_service.list_users(include_inactive=True)
 
-        user = next((u for u in users if u.id == user_id), None)
+        user = next((u for u in users if u.auth_user_id == user_id), None)
         if not user:
             raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -526,7 +526,7 @@ async def deactivate_user_api(
         auth_service = get_multi_user_auth_service()
         users = auth_service.list_users(include_inactive=True)
 
-        user = next((u for u in users if u.id == user_id), None)
+        user = next((u for u in users if u.auth_user_id == user_id), None)
         if not user:
             raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
 

@@ -14,6 +14,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.service_connections.db_service.database.tables.plan import PlanTable
 from common.service_connections.db_service.database.tables.plan_suite_association import (
     PlanSuiteAssociation,
@@ -63,7 +66,6 @@ def add_suite_to_plan(
     suite_id: str,
     execution_order: int,
     engine: Engine,
-    session: Session,
     is_enabled: bool = True,
 ) -> str:
     """Add a suite to a plan with specified execution order.
@@ -114,7 +116,7 @@ def remove_suite_from_plan(
     plan_id: str,
     suite_id: str,
     engine: Engine,
-    session: Session,
+    db_session: Session,
     soft_delete: bool = True,
 ) -> bool:
     """Remove a suite from a plan.
@@ -156,7 +158,7 @@ def remove_suite_from_plan(
 
 
 def reorder_plan_suites(
-    plan_id: str, ordered_suite_ids: List[str], engine: Engine, session: Session
+    plan_id: str, ordered_suite_ids: List[str], engine: Engine
 ) -> int:
     """Reorder suites in a plan by updating execution_order.
 
@@ -210,7 +212,7 @@ def update_suite_execution_order(
     suite_id: str,
     new_execution_order: int,
     engine: Engine,
-    session: Session,
+    db_session: Session,
 ) -> bool:
     """Update execution order for a single suite in a plan.
 
@@ -256,7 +258,7 @@ def update_suite_execution_order(
 
 
 def query_plan_with_suites(
-    plan_id: str, session: Session, engine: Engine, active_only: bool = True
+    plan_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> Optional[PlanWithSuitesModel]:
     """Query a plan with all its suites in execution order.
 
@@ -302,7 +304,7 @@ def query_plan_with_suites(
             suite_dict = {
                 "suite_id": suite.suite_id,
                 "suite_name": suite.suite_name,
-                "suite_description": suite.suite_description,
+                "suite_description": suite.description,
                 "execution_order": exec_order,
                 "is_active": suite.is_active,
                 "association_is_active": assoc_is_active,
@@ -312,14 +314,13 @@ def query_plan_with_suites(
         return PlanWithSuitesModel(
             plan_id=plan.plan_id,
             plan_name=plan.plan_name,
-            plan_description=plan.plan_description,
             account_id=plan.account_id,
             suites=suites,
         )
 
 
 def query_suites_for_plan(
-    plan_id: str, session: Session, engine: Engine, active_only: bool = True
+    plan_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> List[str]:
     """Query suite IDs in a plan in execution order.
 
@@ -347,7 +348,7 @@ def query_suites_for_plan(
 
 
 def query_plans_for_suite(
-    suite_id: str, session: Session, engine: Engine, active_only: bool = True
+    suite_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> List[str]:
     """Query plan IDs that contain a suite.
 
@@ -373,7 +374,7 @@ def query_plans_for_suite(
 
 
 def get_plan_suite_count(
-    plan_id: str, session: Session, engine: Engine, active_only: bool = True
+    plan_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> int:
     """Get count of suites in a plan.
 
@@ -406,7 +407,6 @@ def bulk_add_suites_to_plan(
     plan_id: str,
     suite_ids: List[str],
     engine: Engine,
-    session: Session,
     starting_order: int = 0,
 ) -> List[str]:
     """Add multiple suites to a plan in a single transaction.
@@ -456,7 +456,6 @@ def replace_plan_suites(
     plan_id: str,
     new_suite_ids: List[str],
     engine: Engine,
-    session: Session,
     soft_delete_old: bool = True,
 ) -> Dict[str, List[str]]:
     """Replace all suites in a plan.

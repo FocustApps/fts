@@ -10,6 +10,9 @@ Tests cover:
 
 from sqlalchemy.engine import Engine
 
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.service_connections.db_service.models.suite_test_case_helpers import (
     add_test_case_to_suite,
     reorder_suite_test_cases,
@@ -56,7 +59,7 @@ class TestSuiteTestCaseAssociations:
         # Assert
         assert assoc_id is not None
 
-        with session(engine) as db_session:
+        with session() as db_session:
             suite_with_tests = query_suite_with_test_cases(suite_id, db_session, engine)
 
         assert suite_with_tests is not None
@@ -95,7 +98,7 @@ class TestSuiteTestCaseAssociations:
         # Assert
         assert update_count > 0
 
-        with session(engine) as db_session:
+        with session() as db_session:
             ordered_ids = query_test_cases_for_suite(suite_id, db_session, engine)
 
         assert ordered_ids == new_order
@@ -130,7 +133,7 @@ class TestSuiteTestCaseAssociations:
         # Assert
         assert len(assoc_ids) == 5
 
-        with session(engine) as db_session:
+        with session() as db_session:
             count = get_suite_test_count(suite_id, db_session, engine)
         assert count == 5
 
@@ -171,7 +174,7 @@ class TestSuiteTestCaseAssociations:
         assert len(result["removed"]) == 2
         assert len(result["added"]) == 3
 
-        with session(engine) as db_session:
+        with session() as db_session:
             active_tests = query_test_cases_for_suite(
                 suite_id, db_session, engine, active_only=True
             )
@@ -200,7 +203,7 @@ class TestPlanSuiteAssociations:
         # Assert
         assert assoc_id is not None
 
-        with session(engine) as db_session:
+        with session() as db_session:
             plan_with_suites = query_plan_with_suites(plan_id, db_session, engine)
 
         assert plan_with_suites is not None
@@ -230,7 +233,7 @@ class TestPlanSuiteAssociations:
         # Assert
         assert update_count > 0
 
-        with session(engine) as db_session:
+        with session() as db_session:
             ordered_ids = query_suites_for_plan(plan_id, db_session, engine)
 
         assert ordered_ids == new_order
@@ -255,7 +258,7 @@ class TestPlanSuiteAssociations:
         # Assert
         assert len(assoc_ids) == 4
 
-        with session(engine) as db_session:
+        with session() as db_session:
             plan_with_suites = query_plan_with_suites(plan_id, db_session, engine)
 
         assert len(plan_with_suites.suites) == 4
@@ -295,7 +298,7 @@ class TestCompositeQueries:
         add_test_case_to_suite(suite_id, tc2, 1, engine)
 
         # Act
-        with session(engine) as db_session:
+        with session() as db_session:
             suite_with_tests = query_suite_with_test_cases(suite_id, db_session, engine)
 
         # Assert - Check metadata is included

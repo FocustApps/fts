@@ -11,28 +11,40 @@ from common.service_connections.db_service.database import SystemUnderTestUserTa
 
 class UserModel(BaseModel):
     """
-    Schema for representing a user.
+    Schema for representing a test user.
+    Fields match SystemUnderTestUserTable database schema.
 
     Fields:
-    - id: int | None, the ID of the user.
-    - username: str | None, the username of the user.
-    - email: str | None, the email of the user.
-    - password: str | None, the password of the user.
-    - cloud_provider: CloudProviderEnum | None, the cloud provider of the user.
-    - secret_url: str | None, the secret URL of the user.
-    - environment_id: int | None, the ID of the environment associated with the user.
-    - created_at: str | None, the creation date of the user.
-    - updated_at: str | None, the update date of the user.
+    - sut_user_id: int | None - Primary key
+    - account_id: str | None - Account reference
+    - sut_id: str | None - System under test reference
+    - username: str | None - Test user username
+    - email: str | None - Test user email
+    - password: str | None - Plain password (if not using secret provider)
+    - secret_provider: str | None - Cloud secret provider (AWS, Azure)
+    - secret_url: str | None - URL to secret in cloud provider
+    - secret_name: str | None - Name of secret in cloud provider
+    - environment_id: str | None - Environment reference
+    - is_active: bool - Soft delete flag
+    - deactivated_at: datetime | None - Soft delete timestamp
+    - deactivated_by_user_id: str | None - Who deactivated
+    - created_at: datetime | None - Creation timestamp
+    - updated_at: datetime | None - Update timestamp
     """
 
-    id: int | None = None
+    sut_user_id: int | None = None
+    account_id: str | None = None
+    sut_id: str | None = None
     username: str | None = None
     email: str | None = None
     password: str | None = None
     secret_provider: str | None = None
     secret_url: str | None = None
     secret_name: str | None = None
-    environment_id: int | None = None
+    environment_id: str | None = None
+    is_active: bool = True
+    deactivated_at: datetime | None = None
+    deactivated_by_user_id: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

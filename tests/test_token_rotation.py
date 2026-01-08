@@ -124,7 +124,7 @@ class TestAuthSchedulerLifespanWithAPScheduler:
     """Test cases for auth_scheduler_lifespan with APScheduler available."""
 
     @patch("app.tasks.token_rotation.AsyncIOScheduler")
-    @patch("app.tasks.token_rotation.get_config")
+    @patch("app.tasks.token_rotation.get_base_app_config")
     @patch("app.tasks.token_rotation.initialize_auth_service")
     @patch("app.tasks.token_rotation.external_sync_placeholder")
     def test_lifespan_with_scheduler_enabled(
@@ -166,7 +166,7 @@ class TestAuthSchedulerLifespanWithAPScheduler:
         )
 
     @patch("app.tasks.token_rotation.AsyncIOScheduler")
-    @patch("app.tasks.token_rotation.get_config")
+    @patch("app.tasks.token_rotation.get_base_app_config")
     @patch("app.tasks.token_rotation.initialize_auth_service")
     def test_lifespan_with_scheduler_disabled(
         self, mock_init_service, mock_get_config, mock_scheduler_class
@@ -203,7 +203,7 @@ class TestAuthSchedulerLifespanWithAPScheduler:
         )
 
     @patch("app.tasks.token_rotation.AsyncIOScheduler")
-    @patch("app.tasks.token_rotation.get_config")
+    @patch("app.tasks.token_rotation.get_base_app_config")
     @patch("app.tasks.token_rotation.initialize_auth_service")
     @patch("app.tasks.token_rotation.logger")
     def test_lifespan_with_scheduler_error(

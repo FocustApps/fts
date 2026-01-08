@@ -4,6 +4,120 @@
 
 Fenrir is a **multi-application test automation hub** with a **service-oriented architecture** that abstracts cloud connections, databases, and selenium testing workflows. The system follows a **dual-environment pattern** with Azure deployments (MSSQL) and local development (PostgreSQL).
 
+## Database Schema - Source of Truth
+
+**CRITICAL: Database tables are the pure source of truth** for all schema definitions. The SQLAlchemy table models in `common/service_connections/db_service/database/tables/` define the authoritative schema.
+
+### Schema Hierarchy
+1. **Database Tables** (`database/tables/*.py`) - **SOURCE OF TRUTH**
+   - SQLAlchemy ORM models with `Mapped[]` type hints
+   - Define actual column types, constraints, indexes, and relationships
+   - Only modify tables when there is a confirmed bug
+   
+2. **Pydantic Models** (`models/*_model.py`) - **MUST MATCH TABLES**
+   - Used for API validation, serialization, and business logic
+   - Must mirror all fields from corresponding database tables
+   - Update models whenever table schemas change
+   
+3. **Alembic Migrations** (`alembic/versions/*.py`) - Apply table changes to database
+
+### When Making Schema Changes
+- **Bug fixes in tables**: Create migration immediately after fixing table definition
+- **New features**: Define table first, then update Pydantic model, then create migration
+- **Field mismatches**: Always update Pydantic model to match table (never the reverse)
+
+### Session Management and Function Signatures
+
+**CRITICAL: Two distinct patterns for database functions** in `common/service_connections/db_service/models/*.py`:
+
+1. **Insert/Update/Delete Functions** - Session as callable parameter:
+   ```python
+   from common.service_connections.db_service.database.engine import get_database_session as session
+   
+   def insert_model(model: Model, engine: Engine) -> str:
+       """Insert returns the ID string."""
+       with session() as db_session:
+           db_obj = ModelTable(**model.model_dump())
+           db_session.add(db_obj)
+           db_session.commit()
+           db_session.refresh(db_obj)
+       return db_obj.model_id  # Return ID string
+   
+   def update_model_by_id(id: str, model: Model, engine: Engine) -> bool:
+       """Update returns True if successful."""
+       with session() as db_session:
+           db_obj = db_session.get(ModelTable, id)
+           # ... update logic ...
+           db_session.commit()
+       return True  # Return bool
+   
+   def deactivate_model_by_id(id: str, user_id: str, engine: Engine) -> bool:
+       """Deactivate returns True if successful."""
+       with session() as db_session:
+           # ... soft delete logic ...
+           db_session.commit()
+       return True  # Return bool
+   ```
+
+2. **Query Functions** - Session as Session object parameter:
+   ```python
+   from sqlalchemy.orm import Session
+   
+   def query_model_by_id(id: str, session: Session, engine: Engine) -> Model:
+       """Query functions receive Session object, use it directly."""
+       db_obj = session.query(ModelTable).filter(ModelTable.model_id == id).first()
+       if not db_obj:
+           raise ValueError(f"Model ID {id} not found.")
+       return Model(**db_obj.__dict__)
+   
+   def query_models_by_account(account_id: str, session: Session, engine: Engine) -> List[Model]:
+       """Use passed session directly - NOT with session()."""
+       models = session.query(ModelTable).filter(ModelTable.account_id == account_id).all()
+       return [Model(**m.__dict__) for m in models]
+   ```
+
+3. **Test Pattern** - Tests import session as callable, create Session objects for queries:
+   ```python
+   from common.service_connections.db_service.database.engine import get_database_session as session
+   
+   def test_something(engine):
+       # Insert/update/delete: pass session function (will be called inside function)
+       model_id = insert_model(model, engine)
+       
+       # Query: create Session object with context manager, pass to function
+       with session() as db_session:
+           result = query_model_by_id(model_id, db_session, engine)
+   ```
+
+**Common Errors to Avoid:**
+- ❌ Using `with session()` in query functions when session is a parameter (TypeError: 'Session' object is not callable)
+- ❌ Using `session.query()` when session is imported globally as callable (AttributeError: 'function' object has no attribute 'query')
+- ❌ Returning model objects from insert/update/deactivate functions (should return str/bool)
+- ❌ Inconsistent test calling - query functions MUST receive Session object from `with session() as db_session:`
+
+**Fixing Legacy Model Files:**
+When updating model files to conform to the session pattern:
+1. Check all function signatures - identify insert/update/delete vs query functions
+2. For insert/update/delete: Remove `session` parameter, add global import `from common.service_connections.db_service.database.engine import get_database_session as session`
+3. For query functions: Keep `session: Session` parameter, ensure function uses `session.query()` directly (not `with session()`)
+4. Verify return types: insert → str (ID), update/deactivate → bool, query → Model object(s)
+5. Check tests call functions correctly: insert/update/delete with `(model, engine)`, query with `(params, db_session, engine)` where `db_session` comes from `with session() as db_session:`
+
+**Test Factory Fixtures:**
+Factories in `tests/fixtures/db_model_fixtures.py` should accept optional parameters with auto-creation defaults:
+- `account_factory(owner_user_id: Optional[str] = None)` - Auto-creates owner via `auth_user_factory()` if not provided
+- `system_under_test_factory(account_id: Optional[str] = None, owner_user_id: Optional[str] = None)` - Auto-creates both if needed
+- `plan_factory` accepts both `name` and `plan_name` parameters for backward compatibility
+- This pattern allows tests to call factories without setup boilerplate while maintaining flexibility
+
+**Writing Tests with Database Functions:**
+Tests must follow these patterns:
+1. Import session: `from common.service_connections.db_service.database.engine import get_database_session as session`
+2. For insert/update/deactivate: Call directly - `insert_model(model, engine)`  
+3. For queries: Wrap in session context - `with session() as db_session: result = query_model(id, db_session, engine)`
+4. Use factory-created IDs for foreign keys (never hardcoded strings like "admin")
+5. Factory parameters use `name` not model-specific names like `plan_name` or `suite_name`
+
 ### Core Components
 
 - **`fenrir_app.py`** - FastAPI application with HTML/API dual routing

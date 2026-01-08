@@ -64,8 +64,8 @@ class SystemUnderTestUserTable(Base):
     secret_provider: Mapped[Optional[str]] = mapped_column(sql.String(96), nullable=True)
     secret_url: Mapped[Optional[str]] = mapped_column(sql.String(1024), nullable=True)
     secret_name: Mapped[Optional[str]] = mapped_column(sql.String(1024), nullable=True)
-    environment_id: Mapped[int] = mapped_column(
-        sql.Integer,
+    environment_id: Mapped[str] = mapped_column(
+        sql.String(36),
         sql.ForeignKey("environment.environment_id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -75,7 +75,7 @@ class SystemUnderTestUserTable(Base):
     )
     deactivated_by_user_id: Mapped[Optional[str]] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.id", ondelete="SET NULL"),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

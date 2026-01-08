@@ -18,6 +18,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 
 from common.service_connections.db_service.database.tables.audit_log import (
     AuditLogTable,
@@ -178,7 +181,7 @@ class AuditLogModel(BaseModel):
 # ============================================================================
 
 
-def insert_audit_log(model: AuditLogModel, engine: Engine, session: Session) -> str:
+def insert_audit_log(model: AuditLogModel, engine: Engine) -> str:
     """Insert new audit log record.
 
     This is the ONLY write operation for audit logs. No update or delete allowed.
@@ -186,7 +189,6 @@ def insert_audit_log(model: AuditLogModel, engine: Engine, session: Session) -> 
     Args:
         model: AuditLogModel with audit data
         engine: Database engine
-        session: Active database session
     Returns:
         audit_id of inserted record
 
@@ -207,15 +209,12 @@ def insert_audit_log(model: AuditLogModel, engine: Engine, session: Session) -> 
         return new_audit.audit_id
 
 
-def bulk_insert_audit_logs(
-    models: List[AuditLogModel], engine: Engine, session: Session
-) -> List[str]:
+def bulk_insert_audit_logs(models: List[AuditLogModel], engine: Engine) -> List[str]:
     """Bulk insert multiple audit log records in a single transaction.
 
     Args:
         models: List of AuditLogModel instances
         engine: Database engine
-        session: Active database session
     Returns:
         List of audit_ids for inserted records
 
@@ -281,20 +280,19 @@ def query_audit_logs_by_entity(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session() as db_session:
-        audits = (
-            db_session.query(AuditLogTable)
-            .filter(
-                and_(
-                    AuditLogTable.entity_type == entity_type,
-                    AuditLogTable.entity_id == entity_id,
-                )
+    audits = (
+        session.query(AuditLogTable)
+        .filter(
+            and_(
+                AuditLogTable.entity_type == entity_type,
+                AuditLogTable.entity_id == entity_id,
             )
-            .order_by(AuditLogTable.timestamp.desc())
-            .limit(limit)
-            .all()
         )
-        return [AuditLogModel(**audit.__dict__) for audit in audits]
+        .order_by(AuditLogTable.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return [AuditLogModel(**audit.__dict__) for audit in audits]
 
 
 def query_audit_logs_by_account(
@@ -318,23 +316,22 @@ def query_audit_logs_by_account(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session() as db_session:
-        filters = [AuditLogTable.account_id == account_id]
+    filters = [AuditLogTable.account_id == account_id]
 
-        if start_date:
-            filters.append(AuditLogTable.timestamp >= start_date)
+    if start_date:
+        filters.append(AuditLogTable.timestamp >= start_date)
 
-        if end_date:
-            filters.append(AuditLogTable.timestamp <= end_date)
+    if end_date:
+        filters.append(AuditLogTable.timestamp <= end_date)
 
-        audits = (
-            db_session.query(AuditLogTable)
-            .filter(and_(*filters))
-            .order_by(AuditLogTable.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
-        return [AuditLogModel(**audit.__dict__) for audit in audits]
+    audits = (
+        session.query(AuditLogTable)
+        .filter(and_(*filters))
+        .order_by(AuditLogTable.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return [AuditLogModel(**audit.__dict__) for audit in audits]
 
 
 def query_audit_logs_by_user(
@@ -358,23 +355,22 @@ def query_audit_logs_by_user(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session() as db_session:
-        filters = [AuditLogTable.performed_by_user_id == user_id]
+    filters = [AuditLogTable.performed_by_user_id == user_id]
 
-        if start_date:
-            filters.append(AuditLogTable.timestamp >= start_date)
+    if start_date:
+        filters.append(AuditLogTable.timestamp >= start_date)
 
-        if end_date:
-            filters.append(AuditLogTable.timestamp <= end_date)
+    if end_date:
+        filters.append(AuditLogTable.timestamp <= end_date)
 
-        audits = (
-            db_session.query(AuditLogTable)
-            .filter(and_(*filters))
-            .order_by(AuditLogTable.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
-        return [AuditLogModel(**audit.__dict__) for audit in audits]
+    audits = (
+        session.query(AuditLogTable)
+        .filter(and_(*filters))
+        .order_by(AuditLogTable.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return [AuditLogModel(**audit.__dict__) for audit in audits]
 
 
 def query_sensitive_audit_logs(
@@ -398,26 +394,25 @@ def query_sensitive_audit_logs(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session() as db_session:
-        filters = [AuditLogTable.is_sensitive == True]
+    filters = [AuditLogTable.is_sensitive == True]
 
-        if account_id:
-            filters.append(AuditLogTable.account_id == account_id)
+    if account_id:
+        filters.append(AuditLogTable.account_id == account_id)
 
-        if start_date:
-            filters.append(AuditLogTable.timestamp >= start_date)
+    if start_date:
+        filters.append(AuditLogTable.timestamp >= start_date)
 
-        if end_date:
-            filters.append(AuditLogTable.timestamp <= end_date)
+    if end_date:
+        filters.append(AuditLogTable.timestamp <= end_date)
 
-        audits = (
-            db_session.query(AuditLogTable)
-            .filter(and_(*filters))
-            .order_by(AuditLogTable.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
-        return [AuditLogModel(**audit.__dict__) for audit in audits]
+    audits = (
+        session.query(AuditLogTable)
+        .filter(and_(*filters))
+        .order_by(AuditLogTable.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return [AuditLogModel(**audit.__dict__) for audit in audits]
 
 
 def query_audit_logs_by_action(
@@ -441,23 +436,22 @@ def query_audit_logs_by_action(
     Returns:
         List of AuditLogModel instances ordered by timestamp desc
     """
-    with session() as db_session:
-        filters = [AuditLogTable.action == action]
+    filters = [AuditLogTable.action == action]
 
-        if entity_type:
-            filters.append(AuditLogTable.entity_type == entity_type)
+    if entity_type:
+        filters.append(AuditLogTable.entity_type == entity_type)
 
-        if account_id:
-            filters.append(AuditLogTable.account_id == account_id)
+    if account_id:
+        filters.append(AuditLogTable.account_id == account_id)
 
-        audits = (
-            db_session.query(AuditLogTable)
-            .filter(and_(*filters))
-            .order_by(AuditLogTable.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
-        return [AuditLogModel(**audit.__dict__) for audit in audits]
+    audits = (
+        session.query(AuditLogTable)
+        .filter(and_(*filters))
+        .order_by(AuditLogTable.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return [AuditLogModel(**audit.__dict__) for audit in audits]
 
 
 def get_audit_log_count(

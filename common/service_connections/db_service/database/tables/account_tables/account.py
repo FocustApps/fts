@@ -56,7 +56,11 @@ class AccountTable(Base):
     account_name: Mapped[str] = mapped_column(
         sql.String(255), unique=True, nullable=False
     )
-    owner_user_id: Mapped[str] = mapped_column(sql.String(36), unique=True)
+    owner_user_id: Mapped[str] = mapped_column(
+        sql.String(36),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
     is_active: Mapped[bool] = mapped_column(sql.Boolean, default=True, nullable=False)
     logo_url: Mapped[Optional[str]] = mapped_column(sql.String(512))
     primary_contact: Mapped[Optional[str]] = mapped_column(sql.String(36))
