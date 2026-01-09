@@ -26,6 +26,10 @@ class BaseAppConfig(BaseModel):
     smtp_password: str = ""
     email_subject: str = "Fenrir Auth Token"
 
+    # MailHog settings for local development
+    use_mailhog: bool = False
+    mailhog_api_url: str = "http://mailhog:8025"
+
     # Database settings
     database_type: str = "postgresql"
     db_host: str = "localhost"
@@ -82,6 +86,8 @@ def get_base_app_config() -> BaseAppConfig:
         smtp_username=os.getenv("EMAIL_USER", ""),
         smtp_password=os.getenv("EMAIL_PASSWORD", ""),
         email_subject=os.getenv("EMAIL_SUBJECT", "Fenrir Auth Token"),
+        use_mailhog=os.getenv("USE_MAILHOG", "false").lower() == "true",
+        mailhog_api_url=os.getenv("MAILHOG_API_URL", "http://mailhog:8025"),
         # Database settings from environment
         database_type=os.getenv("DATABASE_TYPE", "postgresql"),
         db_host=os.getenv("DB_HOST", "localhost"),

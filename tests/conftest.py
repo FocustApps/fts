@@ -108,6 +108,41 @@ def cleanup_auth_service():
         pass
 
 
+@pytest.fixture(scope="function")
+def mailhog():
+    """
+    Provide MailHog test helper for email testing.
+
+    Automatically clears emails before each test.
+    Only works when USE_MAILHOG=true environment variable is set.
+    """
+    try:
+        from tests.fixtures.mailhog_helper import MailHogTestHelper
+
+        helper = MailHogTestHelper()
+        helper.clear_all_emails()  # Clean slate for each test
+        yield helper
+    except RuntimeError as e:
+        pytest.skip(f"MailHog not available: {e}")
+
+
+@pytest.fixture(scope="session")
+def mailhog_available():
+    """
+    Check if MailHog is available for testing.
+
+    Returns:
+        bool: True if MailHog is configured and reachable
+    """
+    try:
+        from tests.fixtures.mailhog_helper import MailHogTestHelper
+
+        helper = MailHogTestHelper()
+        return helper.mailhog.is_available()
+    except Exception:
+        return False
+
+
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line("markers", "integration: mark test as integration test")

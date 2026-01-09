@@ -19,6 +19,29 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025" # SMTP server
+      - "8025:8025" # Web UI
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8025",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - local # Runs in local development
+      - test # Also runs with tests
+
   fenrir:
     build:
       context: .
@@ -36,9 +59,55 @@ services:
       PYTHONPATH: /fenrir
       ENVIRONMENT: ${ENVIRONMENT:-production}
       AUTH_EXTERNAL_SYNC_ENABLED: false # Disable main AuthService external sync
-      EMAIL_NOTIFICATION_ENABLED: false # Disable main AuthService emails specifically
+      EMAIL_NOTIFICATION_ENABLED: ${EMAIL_NOTIFICATION_ENABLED:-false}
+      # MailHog SMTP settings for local development
+      SMTP_SERVER: ${SMTP_SERVER:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      EMAIL_USER: ${EMAIL_USER:-fenrir@local.test}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-password}
+      EMAIL_RECIPIENT: ${EMAIL_RECIPIENT:-admin@local.test}
+      USE_MAILHOG: ${USE_MAILHOG:-true}
     depends_on:
       postgres:
         condition: service_healthy
+
+  tests:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POSTGRES_DB: fenrir
+      POSTGRES_USER: fenrir
+      POSTGRES_PASSWORD: fenrirpass
+      POSTGRES_NAME: fenrir_local
+      DATABASE_TYPE: postgres
+      PYTHONPATH: /fenrir
+      # Test-specific settings
+      PYTEST_ARGS: ${PYTEST_ARGS:-tests/ -v --tb=short}
+      # Email testing with MailHog
+      EMAIL_NOTIFICATION_ENABLED: true
+      SMTP_SERVER: mailhog
+      SMTP_PORT: 1025
+      EMAIL_USER: test@fenrir.local
+      EMAIL_PASSWORD: password
+      EMAIL_RECIPIENT: admin@fenrir.local
+      USE_MAILHOG: true
+      MAILHOG_API_URL: http://mailhog:8025
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fenrir:
+        condition: service_started
+      mailhog:
+        condition: service_healthy
+    profiles:
+      - test # Only runs when explicitly requested with --profile test
+    volumes:
+      # Mount test results and reports
+      - ./test-results:/fenrir/test-results
+    command: sh -c "pytest $${PYTEST_ARGS}"
+
 volumes:
   db_data:

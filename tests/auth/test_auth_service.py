@@ -65,8 +65,8 @@ class TestAuthService:
         """Test that generated tokens have correct format."""
         token = auth_service.generate_token()
 
-        # Should be 16 hex characters (64 bits)
-        assert len(token) == 16
+        # Should be 64 hex characters (256 bits)
+        assert len(token) == 64
         assert all(c in "0123456789abcdef" for c in token)
 
     def test_generate_token_uniqueness(self, auth_service):
@@ -103,7 +103,7 @@ class TestAuthService:
         token = auth_service.get_current_token()
 
         assert token is not None
-        assert len(token) == 16
+        assert len(token) == 64
         assert auth_service._current_token == token
 
     def test_get_current_token_returns_cached(self, auth_service):

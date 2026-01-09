@@ -23,4 +23,19 @@ docker rmi fts-fenrir fts-postgres || true
 docker compose build --no-cache
 
 # Pass environment variable to docker compose
-ENVIRONMENT=$ENVIRONMENT docker compose up -d
+# For local environment, also start MailHog with --profile local
+if [ "$ENVIRONMENT" = "local" ]; then
+    echo "Starting services with MailHog (local profile)..."
+    ENVIRONMENT=$ENVIRONMENT docker compose --profile local up -d
+else
+    echo "Starting services without MailHog..."
+    ENVIRONMENT=$ENVIRONMENT docker compose up -d
+fi
+
+echo ""
+echo "✅ Services started successfully!"
+echo ""
+echo "📧 MailHog Web UI: http://localhost:8025"
+echo "🌐 Fenrir App: http://localhost:8080"
+echo "🗄️  PostgreSQL: localhost:5432"
+echo ""
