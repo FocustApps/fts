@@ -226,7 +226,7 @@ def insert_action_chain(
         action_chain.action_chain_id = None
         logging.warning("Action Chain ID will only be set by the system")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         action_chain.created_at = datetime.now(timezone.utc)
         db_chain = ActionChainTable(**action_chain.model_dump())
         db_session.add(db_chain)
@@ -383,7 +383,7 @@ def add_step_to_chain(
     Returns:
         Updated ActionChainModel
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -420,7 +420,7 @@ def remove_step_from_chain(
     Returns:
         Updated ActionChainModel
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -455,7 +455,7 @@ def update_step_at_index(
     Returns:
         Updated ActionChainModel
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -492,7 +492,7 @@ def reorder_steps(
     Returns:
         Updated ActionChainModel
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         db_chain = db_session.get(ActionChainTable, action_chain_id)
         if not db_chain:
             raise ValueError(f"Action Chain ID {action_chain_id} not found.")
@@ -528,7 +528,7 @@ def validate_action_references(
 
     Args:
         action_chain_id: ID of the chain to validate
-        session: Database session factory
+        db_session: Database session object
         engine: Database engine
         use_cache: Whether to use ActionReferenceCache (default: True)
 
@@ -540,36 +540,33 @@ def validate_action_references(
             "total_steps": int
         }
     """
-    with session() as db_session:
-        db_chain = db_session.get(ActionChainTable, action_chain_id)
-        if not db_chain:
-            raise ValueError(f"Action Chain ID {action_chain_id} not found.")
+    db_chain = db_session.get(ActionChainTable, action_chain_id)
+    if not db_chain:
+        raise ValueError(f"Action Chain ID {action_chain_id} not found.")
 
-        steps = db_chain.action_steps or []
-        invalid_steps = []
+    steps = db_chain.action_steps or []
+    invalid_steps = []
 
-        for step in steps:
-            action_type = step.get("action_type")
-            action_id = step.get("action_id")
-            step_name = step.get("step_name")
+    for step in steps:
+        action_type = step.get("action_type")
+        action_id = step.get("action_id")
+        step_name = step.get("step_name")
 
-            if use_cache:
-                exists = ActionReferenceCache.check_exists(
-                    action_type, action_id, db_session
-                )
-            else:
-                exists = ActionReferenceCache._query_action_exists(
-                    action_type, action_id, db_session
-                )
+        if use_cache:
+            exists = ActionReferenceCache.check_exists(action_type, action_id, db_session)
+        else:
+            exists = ActionReferenceCache._query_action_exists(
+                action_type, action_id, db_session
+            )
 
-            if not exists:
-                invalid_steps.append(
-                    {
-                        "step_name": step_name,
-                        "action_type": action_type,
-                        "action_id": action_id,
-                    }
-                )
+        if not exists:
+            invalid_steps.append(
+                {
+                    "step_name": step_name,
+                    "action_type": action_type,
+                    "action_id": action_id,
+                }
+            )
 
     return {
         "valid": len(invalid_steps) == 0,

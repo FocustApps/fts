@@ -77,7 +77,7 @@ def insert_system_under_test(
         system_under_test.sut_id = None
         logging.warning("System Under Test ID will only be set by the system")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         system_under_test.created_at = datetime.now(timezone.utc)
         db_sut = SystemUnderTestTable(**system_under_test.model_dump())
         db_session.add(db_sut)
@@ -122,7 +122,7 @@ def update_system_under_test_by_id(
     Returns:
         bool: True if successful
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         db_sut = db_session.get(SystemUnderTestTable, sut_id)
         if not db_sut:
             raise ValueError(f"System Under Test ID {sut_id} not found.")
@@ -201,7 +201,7 @@ def deactivate_system_under_test_by_id(
     Returns:
         bool: True if successful
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         db_sut = db_session.get(SystemUnderTestTable, sut_id)
         if not db_sut:
             raise ValueError(f"System Under Test ID {sut_id} not found.")
@@ -222,7 +222,7 @@ def reactivate_system_under_test_by_id(sut_id: str, engine: Engine) -> bool:
     Returns:
         bool: True if successful
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         db_sut = db_session.get(SystemUnderTestTable, sut_id)
         if not db_sut:
             raise ValueError(f"System Under Test ID {sut_id} not found.")

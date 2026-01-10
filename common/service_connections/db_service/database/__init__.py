@@ -33,6 +33,7 @@ from common.service_connections.db_service.database.tables import (
     TestCaseTable,
     ActionChainTable,
     EntityTagTable,
+    PurgeTable,
     # Junction tables
     AuthUserAccountAssociation,
     PageFenrirActionAssociation,
@@ -75,6 +76,7 @@ __all__ = [
     "TestCaseTable",
     "ActionChainTable",
     "EntityTagTable",
+    "PurgeTable",
     # Junction tables
     "AuthUserAccountAssociation",
     "PageFenrirActionAssociation",

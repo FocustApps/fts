@@ -20,6 +20,7 @@ from common.service_connections.db_service.database import (
     get_database_session,
     AuthUserTable,
 )
+from common.service_connections.db_service.db_manager import DB_ENGINE as engine
 
 logger = create_logging()
 
@@ -33,7 +34,7 @@ def generate_random_test_email(prefix="test"):
 def completely_delete_user(email):
     """Completely delete a user from the database (not just deactivate)."""
     try:
-        with get_database_session() as session:
+        with get_database_session(engine) as session:
             user = session.query(AuthUserTable).filter_by(email=email).first()
             if user:
                 session.delete(user)
@@ -85,7 +86,7 @@ class TestAuthUsersAPI:
         cleanup_test_users.append(test_admin_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -104,20 +105,20 @@ class TestAuthUsersAPI:
 
     def test_get_auth_users_unauthorized(self, client):
         """Test getting auth users without authentication."""
-        response = client.get("/api/v1/auth-users/users")
+        response = client.get("/v1/api/auth-users/users")
         assert response.status_code == 401
 
     def test_get_auth_users_with_invalid_token(self, client):
         """Test getting auth users with invalid token."""
         headers = {"X-Auth-Token": "invalid_token"}
-        response = client.get("/api/v1/auth-users/users", headers=headers)
+        response = client.get("/v1/api/auth-users/users", headers=headers)
         assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_get_auth_users_authorized(self, client, admin_user_with_token):
         """Test getting auth users with valid admin token."""
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
-        response = client.get("/api/v1/auth-users/users", headers=headers)
+        response = client.get("/v1/api/auth-users/users", headers=headers)
         assert response.status_code == 200
 
         data = response.json()
@@ -134,7 +135,7 @@ class TestAuthUsersAPI:
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -145,7 +146,7 @@ class TestAuthUsersAPI:
             }
 
             response = client.post(
-                "/api/v1/auth-users/users", json=user_data, headers=headers
+                "/v1/api/auth-users/users", json=user_data, headers=headers
             )
             assert response.status_code == 200
 
@@ -166,7 +167,7 @@ class TestAuthUsersAPI:
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -174,14 +175,14 @@ class TestAuthUsersAPI:
 
             # Create user first time
             response = client.post(
-                "/api/v1/auth-users/users", json=user_data, headers=headers
+                "/v1/api/auth-users/users", json=user_data, headers=headers
             )
             assert response.status_code == 200
 
             # Try to create same user again
             user_data["username"] = "Second User"
             response = client.post(
-                "/api/v1/auth-users/users", json=user_data, headers=headers
+                "/v1/api/auth-users/users", json=user_data, headers=headers
             )
             assert response.status_code == 400
 
@@ -196,7 +197,7 @@ class TestAuthUsersAPI:
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -210,7 +211,7 @@ class TestAuthUsersAPI:
 
             # Generate token via API
             response = client.post(
-                f"/api/v1/auth-users/users/{user.id}/generate-token", headers=headers
+                f"/v1/api/auth-users/users/{user.id}/generate-token", headers=headers
             )
             assert response.status_code == 200
 
@@ -228,7 +229,7 @@ class TestAuthUsersAPI:
 
         # Use a very high ID that shouldn't exist
         response = client.post(
-            "/api/v1/auth-users/users/999999/generate-token", headers=headers
+            "/v1/api/auth-users/users/999999/generate-token", headers=headers
         )
         assert response.status_code == 404
 
@@ -243,7 +244,7 @@ class TestAuthUsersAPI:
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -256,7 +257,7 @@ class TestAuthUsersAPI:
             )
 
             # Get user details via API
-            response = client.get(f"/api/v1/auth-users/users/{user.id}", headers=headers)
+            response = client.get(f"/v1/api/auth-users/users/{user.id}", headers=headers)
             assert response.status_code == 200
 
             data = response.json()
@@ -275,7 +276,7 @@ class TestAuthUsersAPI:
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -289,7 +290,7 @@ class TestAuthUsersAPI:
 
             # Delete user via API
             response = client.delete(
-                f"/api/v1/auth-users/users/{user.id}", headers=headers
+                f"/v1/api/auth-users/users/{user.id}", headers=headers
             )
             assert response.status_code == 200
 
@@ -311,7 +312,7 @@ class TestAuthUsersAPI:
         }
 
         response = client.post(
-            "/api/v1/auth-users/users", json=user_data, headers=headers
+            "/v1/api/auth-users/users", json=user_data, headers=headers
         )
         assert response.status_code == 422  # Validation error
 
@@ -322,7 +323,7 @@ class TestAuthUsersAPI:
         user_data = {"username": "Missing Email User", "is_admin": False}
 
         response = client.post(
-            "/api/v1/auth-users/users", json=user_data, headers=headers
+            "/v1/api/auth-users/users", json=user_data, headers=headers
         )
         assert response.status_code == 422  # Validation error
 
@@ -335,7 +336,7 @@ class TestAuthUsersAPI:
         cleanup_test_users.append(user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -351,7 +352,7 @@ class TestAuthUsersAPI:
             headers = {"X-Auth-Token": token}
 
             # Try to access admin endpoint
-            response = client.get("/api/v1/auth-users/users", headers=headers)
+            response = client.get("/v1/api/auth-users/users", headers=headers)
             assert response.status_code == 403  # Forbidden
 
     @pytest.mark.asyncio
@@ -365,7 +366,7 @@ class TestAuthUsersAPI:
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.side_effect = EmailServiceError("Email service down")
 
@@ -377,7 +378,7 @@ class TestAuthUsersAPI:
 
             # User should still be created even if email fails
             response = client.post(
-                "/api/v1/auth-users/users", json=user_data, headers=headers
+                "/v1/api/auth-users/users", json=user_data, headers=headers
             )
             assert response.status_code == 200
 
@@ -392,7 +393,7 @@ class TestAuthUsersAPI:
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
         response = client.post(
-            "/api/v1/auth-users/maintenance/clean-expired-tokens", headers=headers
+            "/v1/api/auth-users/maintenance/clean-expired-tokens", headers=headers
         )
         assert response.status_code == 200
 
@@ -405,7 +406,7 @@ class TestAuthUsersAPI:
         """Test that API responses have correct structure."""
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
-        response = client.get("/api/v1/auth-users/users", headers=headers)
+        response = client.get("/v1/api/auth-users/users", headers=headers)
         assert response.status_code == 200
 
         data = response.json()
@@ -434,7 +435,7 @@ class TestAuthUsersAPI:
         user_data = "invalid json data"
 
         response = client.post(
-            "/api/v1/auth-users/users", data=user_data, headers=headers
+            "/v1/api/auth-users/users", data=user_data, headers=headers
         )
         # Should fail due to content type or JSON parsing
         assert response.status_code in [400, 422]
@@ -444,7 +445,7 @@ class TestAuthUsersAPI:
         """Test that API responses include appropriate headers."""
         headers = {"X-Auth-Token": admin_user_with_token["token"]}
 
-        response = client.get("/api/v1/auth-users/users", headers=headers)
+        response = client.get("/v1/api/auth-users/users", headers=headers)
         assert response.status_code == 200
 
         # Check that response has appropriate headers

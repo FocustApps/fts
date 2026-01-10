@@ -146,7 +146,7 @@ def insert_plan(model: PlanModel, engine: Engine, migrate_suites: bool = True) -
     if "plan_id" not in plan_dict or not plan_dict["plan_id"]:
         plan_dict["plan_id"] = str(uuid4())
 
-    with session() as db_session:
+    with session(engine) as db_session:
         new_plan = PlanTable(**plan_dict)
         db_session.add(new_plan)
         db_session.commit()
@@ -192,7 +192,7 @@ def query_plan_by_id(
     Returns:
         PlanModel if found, None otherwise
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if plan:
             return PlanModel(**plan.__dict__)
@@ -209,7 +209,7 @@ def query_all_plans(db_session: Session, engine: Engine) -> List[PlanModel]:
     Returns:
         List of PlanModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plans = db_session.query(PlanTable).all()
         return [PlanModel(**plan.__dict__) for plan in plans]
 
@@ -236,7 +236,7 @@ def update_plan(plan_id: str, updates: PlanModel, engine: Engine) -> bool:
     # Add updated_at timestamp
     update_dict["updated_at"] = datetime.now(timezone.utc)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -260,7 +260,7 @@ def drop_plan(plan_id: str, engine: Engine, db_session: Session) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -281,7 +281,7 @@ def deactivate_plan(plan_id: str, deactivated_by_user_id: str, engine: Engine) -
     Returns:
         True if deactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -306,7 +306,7 @@ def reactivate_plan(plan_id: str, engine: Engine) -> bool:
     Returns:
         True if reactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -340,7 +340,7 @@ def query_plans_by_account(
     Returns:
         List of PlanModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(PlanTable).filter(PlanTable.account_id == account_id)
 
         if active_only:
@@ -364,7 +364,7 @@ def query_plans_by_owner(
     Returns:
         List of PlanModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(PlanTable).filter(
             PlanTable.owner_user_id == owner_user_id
         )
@@ -390,7 +390,7 @@ def query_plans_by_status(
     Returns:
         List of PlanModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         filters = [PlanTable.status == status]
 
         if account_id:
@@ -418,7 +418,7 @@ def update_plan_status(plan_id: str, new_status: str, engine: Engine) -> bool:
     if new_status not in {"active", "inactive"}:
         raise ValueError(f"Invalid status '{new_status}'. Must be 'active' or 'inactive'")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False

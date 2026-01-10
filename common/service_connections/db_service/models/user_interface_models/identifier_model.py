@@ -14,6 +14,9 @@ from pydantic import BaseModel
 
 # Import centralized database components
 from common.service_connections.db_service.database import IdentifierTable
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 
 
 class IdentifierModel(BaseModel):
@@ -49,45 +52,40 @@ class IdentifierModel(BaseModel):
 ################ Identifier Queries ################
 
 
-def query_all_identifiers(engine: Engine, session: Session) -> List[IdentifierModel]:
+def query_all_identifiers(session: Session, engine: Engine) -> List[IdentifierModel]:
     """Query all identifiers from the database."""
-    with session() as db_session:
-        db_identifiers = db_session.query(IdentifierTable).all()
-        return [
-            _convert_identifier_table_to_model(identifier)
-            for identifier in db_identifiers
-        ]
+    db_identifiers = session.query(IdentifierTable).all()
+    return [
+        _convert_identifier_table_to_model(identifier) for identifier in db_identifiers
+    ]
 
 
 def query_identifier_by_id(
-    identifier_id: int, engine: Engine, session: Session
+    identifier_id: int, session: Session, engine: Engine
 ) -> IdentifierModel:
     """Query an identifier by its ID."""
-    with session() as db_session:
-        db_identifier = (
-            db_session.query(IdentifierTable)
-            .filter(IdentifierTable.id == identifier_id)
-            .first()
-        )
-        if not db_identifier:
-            raise ValueError(f"Identifier with ID {identifier_id} not found.")
-        return _convert_identifier_table_to_model(db_identifier)
+    db_identifier = (
+        session.query(IdentifierTable)
+        .filter(IdentifierTable.identifier_id == identifier_id)
+        .first()
+    )
+    if not db_identifier:
+        raise ValueError(f"Identifier with ID {identifier_id} not found.")
+    return _convert_identifier_table_to_model(db_identifier)
 
 
-def insert_identifier(
-    identifier: IdentifierModel, engine: Engine, session: Session
-) -> IdentifierModel:
+def insert_identifier(identifier: IdentifierModel, engine: Engine) -> int:
     """Insert a new identifier into the database."""
-    with session() as db_session:
+    with session(engine) as db_session:
         # Create IdentifierTable from IdentifierModel
-        identifier_data = identifier.model_dump(exclude={"id"})
+        identifier_data = identifier.model_dump(exclude={"identifier_id"})
         if "created_at" not in identifier_data or identifier_data["created_at"] is None:
             identifier_data["created_at"] = datetime.now()
         db_identifier = IdentifierTable(**identifier_data)
         db_session.add(db_identifier)
         db_session.commit()
         db_session.refresh(db_identifier)
-        return _convert_identifier_table_to_model(db_identifier)
+    return db_identifier.identifier_id
 
 
 def _convert_identifier_table_to_model(
@@ -95,43 +93,44 @@ def _convert_identifier_table_to_model(
 ) -> IdentifierModel:
     """Convert IdentifierTable to IdentifierModel."""
     return IdentifierModel(
-        id=identifier_table.id,
+        identifier_id=identifier_table.identifier_id,
         page_id=identifier_table.page_id,
         element_name=identifier_table.element_name,
         locator_strategy=identifier_table.locator_strategy,
         locator_query=identifier_table.locator_query,
-        action=identifier_table.action,
-        environments=identifier_table.environments,
+        is_active=identifier_table.is_active,
+        deactivated_at=identifier_table.deactivated_at,
+        deactivated_by_user_id=identifier_table.deactivated_by_user_id,
         created_at=identifier_table.created_at,
+        updated_at=identifier_table.updated_at,
     )
 
 
-def drop_identifier_by_id(identifier_id: int, engine: Engine, session: Session) -> int:
+def drop_identifier_by_id(identifier_id: int, engine: Engine) -> bool:
     """Delete an identifier by its ID."""
-    with session() as db_session:
+    with session(engine) as db_session:
         identifier = (
             db_session.query(IdentifierTable)
-            .filter(IdentifierTable.id == identifier_id)
+            .filter(IdentifierTable.identifier_id == identifier_id)
             .first()
         )
         if not identifier:
             raise ValueError(f"Identifier with ID {identifier_id} not found.")
         db_session.delete(identifier)
         db_session.commit()
-        return 1
+    return True
 
 
 def update_identifier_by_id(
     identifier_id: int,
     identifier_update: IdentifierModel,
     engine: Engine,
-    session: Session,
-) -> IdentifierModel:
+) -> bool:
     """Update an identifier by its ID."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_identifier = (
             db_session.query(IdentifierTable)
-            .filter(IdentifierTable.id == identifier_id)
+            .filter(IdentifierTable.identifier_id == identifier_id)
             .first()
         )
         if not db_identifier:
@@ -139,42 +138,39 @@ def update_identifier_by_id(
 
         # Update fields from the model
         update_data = identifier_update.model_dump(
-            exclude={"id", "created_at"}, exclude_unset=True
+            exclude={"identifier_id", "created_at"}, exclude_unset=True
         )
         for key, value in update_data.items():
             setattr(db_identifier, key, value)
 
         db_identifier.updated_at = datetime.now()
         db_session.commit()
-        db_session.refresh(db_identifier)
-        return _convert_identifier_table_to_model(db_identifier)
+    return True
 
 
 def query_identifier_by_element_name(
-    element_name: str, engine: Engine, session: Session
+    element_name: str, session: Session, engine: Engine
 ) -> Optional[IdentifierModel]:
     """Query an identifier by its element name."""
-    with session() as db_session:
-        db_identifier = (
-            db_session.query(IdentifierTable)
-            .filter(IdentifierTable.element_name == element_name)
-            .first()
-        )
-        if not db_identifier:
-            return None
-        return _convert_identifier_table_to_model(db_identifier)
+    db_identifier = (
+        session.query(IdentifierTable)
+        .filter(IdentifierTable.element_name == element_name)
+        .first()
+    )
+    if not db_identifier:
+        return None
+    return _convert_identifier_table_to_model(db_identifier)
 
 
 def query_identifier_by_identifier_value(
-    identifier_value: str, engine: Engine, session: Session
+    identifier_value: str, session: Session, engine: Engine
 ) -> Optional[IdentifierModel]:
     """Query an identifier by its locator query value."""
-    with session() as db_session:
-        db_identifier = (
-            db_session.query(IdentifierTable)
-            .filter(IdentifierTable.locator_query == identifier_value)
-            .first()
-        )
-        if not db_identifier:
-            return None
-        return _convert_identifier_table_to_model(db_identifier)
+    db_identifier = (
+        session.query(IdentifierTable)
+        .filter(IdentifierTable.locator_query == identifier_value)
+        .first()
+    )
+    if not db_identifier:
+        return None
+    return _convert_identifier_table_to_model(db_identifier)

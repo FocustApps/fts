@@ -58,7 +58,7 @@ Root: auth_users
 from common.service_connections.db_service.database.engine import get_database_session as session
 
 def insert_entity(model: EntityModel, engine: Engine) -> str:
-    with session() as db_session:
+    with session(engine) as db_session:
         ...
     return entity_id
 

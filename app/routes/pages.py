@@ -11,7 +11,7 @@ from typing import List
 from common.service_connections.db_service.db_manager import DB_ENGINE
 from app.dependencies.multi_user_auth_dependency import verify_auth_token
 
-from common.service_connections.db_service.models.page_model import (
+from common.service_connections.db_service.models.user_interface_models.page_model import (
     PageModel,
     drop_page_by_id,
     insert_page,
@@ -30,12 +30,13 @@ page_templates = Jinja2Templates(TEMPLATE_PATH)
 @page_router.get("/", name="get_pages")
 async def get_pages(request: Request, token: str = Depends(verify_auth_token)):
     # Get all pages with their data
-    pages: List[PageModel] = query_all_pages(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        pages: List[PageModel] = query_all_pages(session=db_session, engine=DB_ENGINE)
 
     for page in pages:
         del page.created_at
 
-    headers = ["ID", "Page Name", "URL", "Identifiers", "Environments"]
+    headers = ["Page Id", "Page Name", "URL", "Identifiers"]
 
     return page_templates.TemplateResponse(
         "table.html",
@@ -64,15 +65,15 @@ async def new_page(request: Request, token: str = Depends(verify_auth_token)):
 async def view_page(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
-    page = query_page_by_id(page_id=record_id, engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        page = query_page_by_id(page_id=record_id, session=db_session, engine=DB_ENGINE)
 
     # Convert PageModel to a dictionary for the template
     page_dict = {
-        "id": page.id,
+        "page_id": page.page_id,
         "page_name": page.page_name,
         "page_url": page.page_url,
         "created_at": page.created_at,
-        "environments": ", ".join(page.environments) if page.environments else "None",
         "identifier_count": len(page.identifiers),
     }
 
@@ -80,12 +81,10 @@ async def view_page(
     identifiers_list = []
     for identifier in page.identifiers:
         identifier_dict = {
-            "id": identifier.id,
+            "identifier_id": identifier.identifier_id,
             "element_name": identifier.element_name,
             "locator_strategy": identifier.locator_strategy,
             "locator_query": identifier.locator_query,
-            "action": identifier.action,
-            "environments": identifier.environments if identifier.environments else [],
         }
         identifiers_list.append(identifier_dict)
 
@@ -105,12 +104,14 @@ async def view_page(
 async def edit_page_form(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
-    page = query_page_by_id(page_id=record_id, engine=DB_ENGINE, session=Session)
-
+    with Session(DB_ENGINE) as db_session:
+        page = query_page_by_id(page_id=record_id, session=db_session, engine=DB_ENGINE)
 
     # Create a page dictionary with serializable identifiers
     page_dict = page.model_dump()
-    page_dict["identifiers"] = [identifier.model_dump() for identifier in page.identifiers]
+    page_dict["identifiers"] = [
+        identifier.model_dump() for identifier in page.identifiers
+    ]
 
     return page_templates.TemplateResponse(
         "pages/pages_edit.html",
@@ -129,9 +130,11 @@ def edit_page(
     page: PageModel,
     token: str = Depends(verify_auth_token),
 ):
-    updated_page = update_page_by_id(
-        page_id=record_id, page=page, engine=DB_ENGINE, session=Session
-    )
+    update_page_by_id(page_id=record_id, page=page, engine=DB_ENGINE)
+    with Session(DB_ENGINE) as db_session:
+        updated_page = query_page_by_id(
+            page_id=record_id, session=db_session, engine=DB_ENGINE
+        )
     return updated_page
 
 
@@ -139,7 +142,7 @@ def edit_page(
 def delete_page(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
-    drop_page_by_id(page_id=record_id, engine=DB_ENGINE, session=Session)
+    drop_page_by_id(page_id=record_id, engine=DB_ENGINE)
     return {"message": "Page deleted successfully"}
 
 
@@ -151,28 +154,32 @@ def create_page(
     request: Request, page: PageModel, token: str = Depends(verify_auth_token)
 ):
     # The identifiers are now proper IdentifierModel objects, no need for JSON conversion
-    return insert_page(page=page, engine=DB_ENGINE, session=Session)
+    page_id = insert_page(page=page, engine=DB_ENGINE)
+    with Session(DB_ENGINE) as db_session:
+        return query_page_by_id(page_id=page_id, session=db_session, engine=DB_ENGINE)
 
 
 @page_api_router.get("/")
 def get_pages_api(request: Request, token: str = Depends(verify_auth_token)):
-    pages = query_all_pages(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        pages = query_all_pages(session=db_session, engine=DB_ENGINE)
     return {"data": [page.model_dump() for page in pages]}
 
 
 @page_api_router.get("/{record_id}")
 def get_page(record_id: int, token: str = Depends(verify_auth_token)):
-    return query_page_by_id(page_id=record_id, engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        return query_page_by_id(page_id=record_id, session=db_session, engine=DB_ENGINE)
 
 
 @page_api_router.patch("/{record_id}")
 def edit_page(record_id: int, page: PageModel, token: str = Depends(verify_auth_token)):
-    return update_page_by_id(
-        page_id=record_id, page=page, engine=DB_ENGINE, session=Session
-    )
+    update_page_by_id(page_id=record_id, page=page, engine=DB_ENGINE)
+    with Session(DB_ENGINE) as db_session:
+        return query_page_by_id(page_id=record_id, session=db_session, engine=DB_ENGINE)
 
 
 @page_api_router.delete("/{record_id}")
 def delete_page_api(record_id: int, token: str = Depends(verify_auth_token)):
-    drop_page_by_id(page_id=record_id, engine=DB_ENGINE, session=Session)
+    drop_page_by_id(page_id=record_id, engine=DB_ENGINE)
     return {"message": "Page deleted successfully"}

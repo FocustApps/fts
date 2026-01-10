@@ -47,6 +47,9 @@ from common.service_connections.db_service.database.tables.action_chain import (
 from common.service_connections.db_service.database.tables.entity_tag import (
     EntityTagTable,
 )
+from common.service_connections.db_service.database.tables.purge_table import (
+    PurgeTable,
+)
 
 # Junction tables
 from common.service_connections.db_service.database.tables.account_tables.auth_user_account_association import (
@@ -85,6 +88,7 @@ __all__ = [
     "TestCaseTable",
     "ActionChainTable",
     "EntityTagTable",
+    "PurgeTable",
     # Junction tables
     "AuthUserAccountAssociation",
     "PageFenrirActionAssociation",

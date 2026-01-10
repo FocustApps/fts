@@ -47,7 +47,7 @@ class TestMultiTenantIsolation:
         )
 
         # Query tenant1's suites - should only see their own
-        with session() as db_session:
+        with session(engine) as db_session:
             tenant1_suites = query_suites_by_account(
                 account_id=tenant1["account_id"],
                 session=db_session,
@@ -81,7 +81,7 @@ class TestMultiTenantIsolation:
         )
 
         # Query tenant1's test cases
-        with session() as db_session:
+        with session(engine) as db_session:
             tenant1_tests = query_test_cases_by_account(
                 account_id=tenant1["account_id"],
                 session=db_session,
@@ -123,7 +123,7 @@ class TestTagBasedQueries:
         account_id = tagged_entities["account_id"]
 
         # Query suites tagged with smoke
-        with session() as db_session:
+        with session(engine) as db_session:
             smoke_suite_ids = query_entities_by_tag(
                 tag_name="smoke",
                 entity_type="suite",
@@ -133,7 +133,7 @@ class TestTagBasedQueries:
             )
 
         # Query test_cases tagged with smoke
-        with session() as db_session:
+        with session(engine) as db_session:
             smoke_test_ids = query_entities_by_tag(
                 tag_name="smoke",
                 entity_type="test_case",
@@ -151,7 +151,7 @@ class TestTagBasedQueries:
         """Find all entities tagged with 'api'."""
         account_id = tagged_entities["account_id"]
 
-        with session() as db_session:
+        with session(engine) as db_session:
             api_test_ids = query_entities_by_tag(
                 tag_name="api",
                 entity_type="test_case",

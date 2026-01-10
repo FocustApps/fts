@@ -24,7 +24,9 @@ from app.services.multi_user_auth_service import (
     get_multi_user_auth_service,
     MultiUserAuthError,
 )
-from common.service_connections.db_service.models.auth_user_model import AuthUserModel
+from common.service_connections.db_service.models.account_models.auth_user_model import (
+    AuthUserModel,
+)
 from common.app_logging import create_logging
 from app.routes.template_dataclasses import ViewRecordDataclass
 
@@ -66,7 +68,7 @@ class AddUserRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    auth_user_id: str
     email: str
     username: Optional[str]
     is_admin: bool
@@ -81,7 +83,7 @@ class UserResponse(BaseModel):
     def from_auth_user(cls, user: AuthUserModel) -> "UserResponse":
         """Convert AuthUserModel to API response model."""
         return cls(
-            id=user.auth_user_id,
+            auth_user_id=user.auth_user_id,
             email=user.email,
             username=user.username,
             is_admin=user.is_admin,
@@ -111,7 +113,7 @@ async def get_auth_users_view(
         for user in users:
             # Create display object with clean field names
             user_display = AuthUserDisplay(
-                id=user.auth_user_id,
+                auth_user_id=user.auth_user_id,
                 email=user.email,
                 username=user.username or "—",
                 is_admin="✓" if user.is_admin else "—",
@@ -133,7 +135,7 @@ async def get_auth_users_view(
             ]
         else:
             headers = [
-                "Id",
+                "Auth User Id",
                 "Email",
                 "Username",
                 "Is Admin",
@@ -172,7 +174,7 @@ async def get_auth_users_view(
 @auth_users_views_router.get("/{record_id}", response_class=HTMLResponse)
 async def view_auth_user(
     request: Request,
-    record_id: int,
+    record_id: str,
     auth_context: AuthContext = Depends(verify_admin_auth_token),
 ):
     """Display details for a specific auth user."""
@@ -184,7 +186,7 @@ async def view_auth_user(
 
         # Convert user to dict and mask sensitive data (similar to users.py pattern)
         user_dict = {
-            "id": user.auth_user_id,
+            "auth_user_id": user.auth_user_id,
             "email": user.email,
             "username": user.username or "—",
             "is_admin": "Yes" if user.is_admin else "No",
@@ -228,7 +230,7 @@ async def view_auth_user(
 @auth_users_views_router.get("/{record_id}/edit", response_class=HTMLResponse)
 async def edit_auth_user(
     request: Request,
-    record_id: int,
+    record_id: str,
     auth_context: AuthContext = Depends(verify_admin_auth_token),
 ):
     """Placeholder for editing auth user - currently not implemented."""
@@ -312,7 +314,7 @@ async def create_auth_user_view(
 @auth_users_views_router.post("/{user_id}/generate-token", response_class=HTMLResponse)
 async def generate_token_view(
     request: Request,
-    user_id: int,
+    user_id: str,
     auth_context: AuthContext = Depends(verify_admin_auth_token),
 ):
     """Generate a new token for a user (HTMX endpoint)."""
@@ -361,7 +363,7 @@ async def generate_token_view(
 @auth_users_views_router.post("/{record_id}/deactivate", response_class=HTMLResponse)
 async def deactivate_auth_user_view(
     request: Request,
-    record_id: int,
+    record_id: str,
     auth_context: AuthContext = Depends(verify_admin_auth_token),
 ):
     """Deactivate a user (HTMX endpoint)."""

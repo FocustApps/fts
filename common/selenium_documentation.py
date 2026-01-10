@@ -95,7 +95,7 @@ def get_selenium_controller_methods_documentation() -> Dict[str, MethodDocumenta
                         type_hint=type_hint,
                         default_value=default_value,
                         is_optional=is_optional,
-                    )
+                    ).model_dump()
                     parameters.append(method_param)
 
                 # Extract return type annotation
@@ -119,7 +119,7 @@ def get_selenium_controller_methods_documentation() -> Dict[str, MethodDocumenta
                     docstring=docstring,
                     parameters=parameters,
                     return_type=return_type,
-                )
+                ).model_dump()
 
                 methods_doc[name] = method_doc
 

@@ -65,7 +65,7 @@ class TestPolymorphicTagging:
         )
 
         # Assert - Query entities by tag
-        with session() as db_session:
+        with session(engine) as db_session:
             suite_entities = query_entities_by_tag(
                 tag_name="high",
                 entity_type="suite",
@@ -119,7 +119,7 @@ class TestPolymorphicTagging:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             tags = query_tags_for_entity(
                 entity_type="suite",
                 entity_id=suite_id,
@@ -167,7 +167,7 @@ class TestPolymorphicTagging:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             priority_tags = query_tags_by_category(
                 tag_category="priority",
                 account_id=account_id,
@@ -216,7 +216,7 @@ class TestPolymorphicTagging:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             unique_names = query_unique_tag_names(
                 account_id=account_id, db_session=db_session, engine=engine
             )
@@ -255,7 +255,7 @@ class TestBulkTagOperations:
         # Assert
         assert len(tag_ids) == 3
 
-        with session() as db_session:
+        with session(engine) as db_session:
             tags = query_tags_for_entity(
                 entity_type="suite",
                 entity_id=suite_id,
@@ -303,7 +303,7 @@ class TestBulkTagOperations:
         assert len(result["deactivated"]) == 2
         assert len(result["created"]) == 3
 
-        with session() as db_session:
+        with session(engine) as db_session:
             active_tags = query_tags_for_entity(
                 entity_type="suite",
                 entity_id=suite_id,
@@ -326,7 +326,7 @@ class TestAccountRLSContext:
         account_id = "test-account-123"
 
         # Act & Assert - Context should not raise errors
-        with session() as db_session:
+        with session(engine) as db_session:
             with AccountRLSContext(db_session, account_id=account_id):
                 # Inside context, session variable is set
                 # In production, this would filter queries
@@ -340,7 +340,7 @@ class TestAccountRLSContext:
         account2 = "account-2"
 
         # Act & Assert - Nested contexts should work
-        with session() as db_session:
+        with session(engine) as db_session:
             with AccountRLSContext(db_session, account_id=account1):
                 # Inner context
                 with AccountRLSContext(db_session, account_id=account2):
@@ -355,7 +355,7 @@ class TestAccountRLSContext:
         max_depth = AccountRLSContext.MAX_STACK_DEPTH
 
         # Act & Assert - Should raise RuntimeError at depth limit
-        with session() as db_session:
+        with session(engine) as db_session:
             with pytest.raises(RuntimeError, match="Maximum RLS context depth"):
                 # Try to nest beyond limit
                 def nest_contexts(depth):
@@ -374,7 +374,7 @@ class TestAccountRLSContext:
         def thread_func(thread_id, account_id):
             """Function to run in separate thread."""
             try:
-                with session() as db_session:
+                with session(engine) as db_session:
                     with AccountRLSContext(db_session, account_id=account_id):
                         # Each thread should have independent stack
                         results[thread_id] = "success"
@@ -429,7 +429,7 @@ class TestTagSoftDelete:
         # Assert
         assert result is True
 
-        with session() as db_session:
+        with session(engine) as db_session:
             tag = query_entity_tag_by_id(tag_id, db_session, engine)
 
         assert tag.is_active is False

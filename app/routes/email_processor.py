@@ -32,7 +32,8 @@ email_processor_templates = Jinja2Templates(directory=TEMPLATE_PATH)
 async def get_email_processing_items(
     request: Request, token: str = Depends(verify_auth_token)
 ):
-    email_items = query_all_email_items(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        email_items = query_all_email_items(session=db_session, engine=DB_ENGINE)
     for email_item in email_items:
         del email_item.created_at
         del email_item.updated_at
@@ -45,7 +46,7 @@ async def get_email_processing_items(
     else:
         # Default headers when no email items exist
         headers = [
-            "Id",
+            "Email Processor Id",
             "Email Item Id",
             "Multi Item Email Ids",
             "Multi Email Flag",
@@ -75,9 +76,10 @@ async def view_email_item(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
 
-    email_item = query_email_item_by_id(
-        email_item_id=record_id, engine=DB_ENGINE, session=Session
-    )
+    with Session(DB_ENGINE) as db_session:
+        email_item = query_email_item_by_id(
+            email_item_id=record_id, session=db_session, engine=DB_ENGINE
+        )
     return email_processor_templates.TemplateResponse(
         "view_record.html",
         ViewRecordDataclass(
@@ -118,15 +120,16 @@ async def create_email_item(
     except:
         return f"Email Item ID {email_item.email_item_id} not found."
     try:
-        if query_email_item_by_email_item_id(
-            email_item.email_item_id.__str__(), engine=DB_ENGINE, session=Session
-        ):
-            return f"Email Item ID {email_item.email_item_id} already exists."
+        with Session(DB_ENGINE) as db_session:
+            if query_email_item_by_email_item_id(
+                email_item.email_item_id.__str__(), session=db_session, engine=DB_ENGINE
+            ):
+                return f"Email Item ID {email_item.email_item_id} already exists."
     except ValueError:
         pass
 
     if valid_email_item.id:
-        email_item = insert_email_item(email_item, engine=DB_ENGINE, session=Session)
+        email_item = insert_email_item(email_item, engine=DB_ENGINE)
         return email_processor_templates.TemplateResponse(
             "view_record.html",
             ViewRecordDataclass(
@@ -146,7 +149,7 @@ async def update_email_item(
         email_item.multi_attachment_flag = True
 
     email_item = update_email_item_by_id(
-        email_item_id=record_id, email_item=email_item, engine=DB_ENGINE, session=Session
+        email_item_id=record_id, email_item=email_item, engine=DB_ENGINE
     )
     return email_processor_templates.TemplateResponse(
         "view_record.html",
@@ -165,9 +168,10 @@ async def update_email_item(
 async def view_edit_email_item(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
-    email_item = query_email_item_by_id(
-        email_item_id=record_id, engine=DB_ENGINE, session=Session
-    )
+    with Session(DB_ENGINE) as db_session:
+        email_item = query_email_item_by_id(
+            email_item_id=record_id, session=db_session, engine=DB_ENGINE
+        )
     return email_processor_templates.TemplateResponse(
         name="email_processor/email_processor_edit.html",
         context=ViewRecordDataclass(
@@ -185,7 +189,5 @@ async def delete_email_item(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
 
-    email_item = drop_email_item_by_id(
-        email_item_id=record_id, engine=DB_ENGINE, session=Session
-    )
+    email_item = drop_email_item_by_id(email_item_id=record_id, engine=DB_ENGINE)
     return email_item

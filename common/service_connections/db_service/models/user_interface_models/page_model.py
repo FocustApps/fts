@@ -14,7 +14,12 @@ from pydantic import BaseModel
 
 from common.fenrir_enums import EnvironmentEnum
 from common.service_connections.db_service.database import PageTable, IdentifierTable
-from common.service_connections.db_service.models.identifier_model import IdentifierModel
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
+from common.service_connections.db_service.models.user_interface_models.identifier_model import (
+    IdentifierModel,
+)
 
 
 # Use the centralized PageTable from database.py
@@ -58,12 +63,12 @@ class PageModel(BaseModel):
 ################ Page Queries ################
 
 
-def insert_page(page: PageModel, engine: Engine, session: Session) -> PageModel:
+def insert_page(page: PageModel, engine: Engine) -> int:
     """Insert a new page with its identifiers into the database."""
-    if page.id:
-        page.id = None
+    if page.page_id:
+        page.page_id = None
         logging.error("Page ID must be None to insert a new page.")
-    with session() as db_session:
+    with session(engine) as db_session:
         # Create PageTable without identifiers first
         page_data = page.model_dump(exclude={"identifiers"})
         page_data["created_at"] = datetime.now()
@@ -74,33 +79,28 @@ def insert_page(page: PageModel, engine: Engine, session: Session) -> PageModel:
         # Create identifiers if any
         for identifier in page.identifiers:
 
-            identifier_data = identifier.model_dump(exclude={"id"})
-            identifier_data["page_id"] = db_page.id
+            identifier_data = identifier.model_dump(exclude={"identifier_id"})
+            identifier_data["page_id"] = db_page.page_id
             identifier_data["created_at"] = datetime.now()
             db_identifier = IdentifierTable(**identifier_data)
             db_session.add(db_identifier)
 
         db_session.commit()
-        db_session.refresh(db_page)
-
-        # Convert back to PageModel with identifiers while session is still active
-        return _convert_page_table_to_model(db_page)
+    return db_page.page_id
 
 
-def query_page_by_id(page_id: int, engine: Engine, session: Session) -> PageModel:
+def query_page_by_id(page_id: int, session: Session, engine: Engine) -> PageModel:
     """Query a page by its ID."""
-    with session() as db_session:
-        page = db_session.query(PageTable).filter(PageTable.id == page_id).first()
-        if not page:
-            raise ValueError(f"Page with ID {page_id} not found.")
-        return _convert_page_table_to_model(page)
+    page = session.query(PageTable).filter(PageTable.page_id == page_id).first()
+    if not page:
+        raise ValueError(f"Page with ID {page_id} not found.")
+    return _convert_page_table_to_model(page)
 
 
-def query_all_pages(engine: Engine, session: Session) -> List[PageModel]:
+def query_all_pages(session: Session, engine: Engine) -> List[PageModel]:
     """Query all pages from the database."""
-    with session() as db_session:
-        pages = db_session.query(PageTable).all()
-        return [_convert_page_table_to_model(page) for page in pages]
+    pages = session.query(PageTable).all()
+    return [_convert_page_table_to_model(page) for page in pages]
 
 
 def _convert_page_table_to_model(page_table: PageTable) -> PageModel:
@@ -109,32 +109,36 @@ def _convert_page_table_to_model(page_table: PageTable) -> PageModel:
     identifiers = []
     for db_identifier in page_table.identifiers:
         identifier_dict = {
-            "id": db_identifier.id,
+            "identifier_id": db_identifier.identifier_id,
             "page_id": db_identifier.page_id,
             "element_name": db_identifier.element_name,
             "locator_strategy": db_identifier.locator_strategy,
             "locator_query": db_identifier.locator_query,
-            "action": db_identifier.action,
-            "environments": db_identifier.environments,
+            "is_active": db_identifier.is_active,
+            "deactivated_at": db_identifier.deactivated_at,
+            "deactivated_by_user_id": db_identifier.deactivated_by_user_id,
             "created_at": db_identifier.created_at,
+            "updated_at": db_identifier.updated_at,
         }
         identifiers.append(IdentifierModel(**identifier_dict))
 
     return PageModel(
-        id=page_table.id,
+        page_id=page_table.page_id,
         page_name=page_table.page_name,
         page_url=page_table.page_url,
-        created_at=page_table.created_at.isoformat(),
-        identifiers=identifiers,
         environments=page_table.environments,
+        is_active=page_table.is_active,
+        deactivated_at=page_table.deactivated_at,
+        deactivated_by_user_id=page_table.deactivated_by_user_id,
+        created_at=page_table.created_at,
+        updated_at=page_table.updated_at,
+        identifiers=identifiers,
     )
 
 
-def update_page_by_id(
-    page_id: int, page: PageModel, engine: Engine, session: Session
-) -> PageModel:
+def update_page_by_id(page_id: int, page: PageModel, engine: Engine) -> bool:
     """Update a page by its ID."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_page = db_session.get(PageTable, page_id)
         if not db_page:
             raise ValueError(f"Page with ID {page_id} not found.")
@@ -143,7 +147,7 @@ def update_page_by_id(
 
         # Update basic page fields (excluding identifiers)
         page_data = page.model_dump(
-            exclude={"identifiers", "id", "created_at"}, exclude_unset=True
+            exclude={"identifiers", "page_id", "created_at"}, exclude_unset=True
         )
         for key, value in page_data.items():
             setattr(db_page, key, value)
@@ -156,46 +160,36 @@ def update_page_by_id(
 
             # Add new identifiers
             for identifier in page.identifiers:
-                identifier_data = identifier.model_dump(exclude={"id"})
-                identifier_data["page_id"] = db_page.id
+                identifier_data = identifier.model_dump(exclude={"identifier_id"})
+                identifier_data["page_id"] = db_page.page_id
                 if "created_at" not in identifier_data:
                     identifier_data["created_at"] = datetime.now()
                 db_identifier = IdentifierTable(**identifier_data)
                 db_session.add(db_identifier)
 
         db_session.commit()
-        db_session.refresh(db_page)
-
-    return _convert_page_table_to_model(db_page)
+    return True
 
 
-def drop_page_by_id(page_id: int, engine: Engine, session: Session) -> int:
+def drop_page_by_id(page_id: int, engine: Engine) -> bool:
     """Delete a page by its ID."""
-    with session() as db_session:
+    with session(engine) as db_session:
         page = db_session.get(PageTable, page_id)
         if not page:
             raise ValueError(f"Page with ID {page_id} not found.")
         db_session.delete(page)
         db_session.commit()
         logging.info("Page ID %s deleted.", page_id)
-    return 1
+    return True
 
 
-def query_page_by_name(page_name: str, engine: Engine, session: Session) -> PageTable:
+def query_page_by_name(page_name: str, session: Session, engine: Engine) -> PageTable:
     """Query a page by its name."""
-    with session() as db_session:
-        return (
-            db_session.query(PageTable).filter(PageTable.page_name == page_name).first()
-        )
+    return session.query(PageTable).filter(PageTable.page_name == page_name).first()
 
 
 def query_page_by_environment(
-    environment: str, engine: Engine, session: Session
+    environment: str, session: Session, engine: Engine
 ) -> PageTable:
     """Query pages by environment."""
-    with session() as db_session:
-        return (
-            db_session.query(PageTable)
-            .filter(PageTable.environments == environment)
-            .all()
-        )
+    return session.query(PageTable).filter(PageTable.environments == environment).all()

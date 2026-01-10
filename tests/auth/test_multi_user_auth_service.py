@@ -27,6 +27,7 @@ from common.service_connections.db_service.database import (
     get_database_session,
     AuthUserTable,
 )
+from common.service_connections.db_service.db_manager import DB_ENGINE
 from common.app_logging import create_logging
 
 logger = create_logging()
@@ -79,7 +80,7 @@ def database_transaction():
 def completely_delete_user(email):
     """Completely delete a user from the database (not just deactivate)."""
     try:
-        with get_database_session() as session:
+        with get_database_session(DB_ENGINE) as session:
             user = session.query(AuthUserTable).filter_by(email=email).first()
             if user:
                 session.delete(user)
@@ -126,7 +127,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -152,7 +153,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -175,7 +176,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -204,7 +205,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -233,7 +234,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -266,7 +267,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -297,7 +298,7 @@ class TestMultiUserAuth:
         # Add test users
         test_emails = []
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -340,7 +341,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -379,7 +380,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 
@@ -426,7 +427,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(test_user_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.side_effect = EmailServiceError("Email service unavailable")
 
@@ -454,7 +455,7 @@ class TestMultiUserAuth:
         cleanup_test_users.append(admin_email)
 
         with patch(
-            "app.services.email_service.send_user_token_notification"
+            "app.services.email_service.send_multiuser_token_notification"
         ) as mock_email:
             mock_email.return_value = True
 

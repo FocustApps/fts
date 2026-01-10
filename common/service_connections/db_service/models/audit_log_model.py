@@ -202,7 +202,7 @@ def insert_audit_log(model: AuditLogModel, engine: Engine) -> str:
 
     audit_dict = model.model_dump(exclude_unset=True)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         new_audit = AuditLogTable(**audit_dict)
         db_session.add(new_audit)
         db_session.commit()
@@ -225,7 +225,7 @@ def bulk_insert_audit_logs(models: List[AuditLogModel], engine: Engine) -> List[
     audit_ids = []
     current_time = datetime.now(timezone.utc)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         for model in models:
             # Set timestamp if not provided
             if model.timestamp is None:
@@ -258,7 +258,7 @@ def query_audit_log_by_id(
     Returns:
         AuditLogModel if found, None otherwise
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         audit = db_session.get(AuditLogTable, audit_id)
         if audit:
             return AuditLogModel(**audit.__dict__)
@@ -473,7 +473,7 @@ def get_audit_log_count(
     Returns:
         Count of matching audit log records
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         filters = []
 
         if account_id:

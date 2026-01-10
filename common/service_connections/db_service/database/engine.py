@@ -127,7 +127,7 @@ def _initialize_session_factory() -> sessionmaker[Session]:
 
 
 @contextmanager
-def get_database_session() -> Generator[Session, None, None]:
+def get_database_session(engine) -> Generator[Session, None, None]:
     """
     Context manager for database sessions.
 
@@ -138,7 +138,7 @@ def get_database_session() -> Generator[Session, None, None]:
         Database session
 
     Example:
-        with get_database_session() as session:
+        with get_database_session(engine) as session:
             user = session.query(AuthUserTable).filter_by(email="test@example.com").first()
     """
     session_factory = _initialize_session_factory()

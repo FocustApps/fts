@@ -95,7 +95,7 @@ def add_test_case_to_suite(
         is_active=is_enabled,
     )
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify suite exists
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:
@@ -137,7 +137,7 @@ def remove_test_case_from_suite(
     Raises:
         SQLAlchemyError: If database operation fails
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         assoc = (
             db_session.query(SuiteTestCaseAssociation)
             .filter(
@@ -179,7 +179,7 @@ def reorder_suite_test_cases(
         ValueError: If test case IDs don't match existing associations
         SQLAlchemyError: If database operation fails
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         # Get all active associations for suite
         assocs = (
             db_session.query(SuiteTestCaseAssociation)
@@ -240,7 +240,7 @@ def update_test_case_execution_order(
     if new_execution_order < 0:
         raise ValueError(f"execution_order must be >= 0, got {new_execution_order}")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         assoc = (
             db_session.query(SuiteTestCaseAssociation)
             .filter(
@@ -279,7 +279,7 @@ def query_suite_with_test_cases(
     Returns:
         SuiteWithTestCasesModel with populated test_cases list, or None if suite not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         # Get suite
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:
@@ -346,7 +346,7 @@ def query_test_cases_for_suite(
     Returns:
         List of test_case_id strings in execution order
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = (
             db_session.query(SuiteTestCaseAssociation.test_case_id)
             .filter(SuiteTestCaseAssociation.suite_id == suite_id)
@@ -374,7 +374,7 @@ def query_suites_for_test_case(
     Returns:
         List of suite_id strings
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(SuiteTestCaseAssociation.suite_id).filter(
             SuiteTestCaseAssociation.test_case_id == test_case_id
         )
@@ -400,7 +400,7 @@ def get_suite_test_count(
     Returns:
         Number of test cases in suite
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(
             func.count(SuiteTestCaseAssociation.association_id)
         ).filter(SuiteTestCaseAssociation.suite_id == suite_id)
@@ -440,7 +440,7 @@ def bulk_add_test_cases_to_suite(
     """
     assoc_ids = []
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify suite exists
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:
@@ -492,7 +492,7 @@ def replace_suite_test_cases(
     """
     result = {"removed": [], "added": []}
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify suite exists
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:

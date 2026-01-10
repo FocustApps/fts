@@ -44,7 +44,7 @@ class TestPlanLegacyMigration:
         )
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             plan = query_plan_by_id(plan_id, db_session, engine)
 
         assert plan.plan_name == "Modern Plan"
@@ -78,7 +78,7 @@ class TestPlanLegacyMigration:
         )
 
         # Assert - Legacy field should be empty after migration
-        with session() as db_session:
+        with session(engine) as db_session:
             plan = query_plan_by_id(plan_id, db_session, engine)
 
             # Check that associations were created
@@ -121,7 +121,7 @@ class TestPlanLegacyMigration:
         )
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             plan = query_plan_by_id(plan_id, db_session, engine)
             plan_suites = query_suites_for_plan(
                 plan_id=plan_id, db_session=db_session, engine=engine
@@ -160,7 +160,7 @@ class TestPlanLegacyMigration:
         )
 
         # Assert - Legacy field preserved, no associations created
-        with session() as db_session:
+        with session(engine) as db_session:
             plan = query_plan_by_id(plan_id, db_session, engine)
             plan_suites = query_suites_for_plan(
                 plan_id=plan_id, db_session=db_session, engine=engine
@@ -187,7 +187,7 @@ class TestPlanCRUD:
         )
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             plan = query_plan_by_id(plan_id, db_session, engine)
 
         assert plan.plan_name == "Integration Test Plan"
@@ -204,7 +204,7 @@ class TestPlanCRUD:
         plan3 = plan_factory(account_id=account2, name="Account 2 Plan")
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             account1_plans = query_plans_by_account(
                 account_id=account1, db_session=db_session, engine=engine
             )
@@ -231,7 +231,7 @@ class TestPlanCRUD:
         plan_id = plan_factory(account_id=account_id, plan_name="Original Name")
 
         # Get existing plan to update
-        with session() as db_session:
+        with session(engine) as db_session:
             existing_plan = query_plan_by_id(plan_id, db_session, engine)
 
         # Update the plan_name
@@ -247,7 +247,7 @@ class TestPlanCRUD:
         # Assert
         assert result is True
 
-        with session() as db_session:
+        with session(engine) as db_session:
             plan = query_plan_by_id(plan_id, db_session, engine)
 
         assert plan.plan_name == "Updated Name"
@@ -269,7 +269,7 @@ class TestPlanCRUD:
         # Assert
         assert result is True
 
-        with session() as db_session:
+        with session(engine) as db_session:
             plan = query_plan_by_id(plan_id, db_session, engine)
 
         assert plan.is_active is False

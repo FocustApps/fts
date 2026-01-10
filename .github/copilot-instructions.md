@@ -36,7 +36,7 @@ Fenrir is a **multi-application test automation hub** with a **service-oriented 
    
    def insert_model(model: Model, engine: Engine) -> str:
        """Insert returns the ID string."""
-       with session() as db_session:
+       with session(engine) as db_session:
            db_obj = ModelTable(**model.model_dump())
            db_session.add(db_obj)
            db_session.commit()
@@ -45,7 +45,7 @@ Fenrir is a **multi-application test automation hub** with a **service-oriented 
    
    def update_model_by_id(id: str, model: Model, engine: Engine) -> bool:
        """Update returns True if successful."""
-       with session() as db_session:
+       with session(engine) as db_session:
            db_obj = db_session.get(ModelTable, id)
            # ... update logic ...
            db_session.commit()
@@ -53,7 +53,7 @@ Fenrir is a **multi-application test automation hub** with a **service-oriented 
    
    def deactivate_model_by_id(id: str, user_id: str, engine: Engine) -> bool:
        """Deactivate returns True if successful."""
-       with session() as db_session:
+       with session(engine) as db_session:
            # ... soft delete logic ...
            db_session.commit()
        return True  # Return bool
@@ -71,7 +71,7 @@ Fenrir is a **multi-application test automation hub** with a **service-oriented 
        return Model(**db_obj.__dict__)
    
    def query_models_by_account(account_id: str, session: Session, engine: Engine) -> List[Model]:
-       """Use passed session directly - NOT with session()."""
+       """Use passed session directly - NOT with session(engine)."""
        models = session.query(ModelTable).filter(ModelTable.account_id == account_id).all()
        return [Model(**m.__dict__) for m in models]
    ```
@@ -85,23 +85,23 @@ Fenrir is a **multi-application test automation hub** with a **service-oriented 
        model_id = insert_model(model, engine)
        
        # Query: create Session object with context manager, pass to function
-       with session() as db_session:
+       with session(engine) as db_session:
            result = query_model_by_id(model_id, db_session, engine)
    ```
 
 **Common Errors to Avoid:**
-- ❌ Using `with session()` in query functions when session is a parameter (TypeError: 'Session' object is not callable)
+- ❌ Using `with session(engine)` in query functions when session is a parameter (TypeError: 'Session' object is not callable)
 - ❌ Using `session.query()` when session is imported globally as callable (AttributeError: 'function' object has no attribute 'query')
 - ❌ Returning model objects from insert/update/deactivate functions (should return str/bool)
-- ❌ Inconsistent test calling - query functions MUST receive Session object from `with session() as db_session:`
+- ❌ Inconsistent test calling - query functions MUST receive Session object from `with session(engine) as db_session:`
 
 **Fixing Legacy Model Files:**
 When updating model files to conform to the session pattern:
 1. Check all function signatures - identify insert/update/delete vs query functions
 2. For insert/update/delete: Remove `session` parameter, add global import `from common.service_connections.db_service.database.engine import get_database_session as session`
-3. For query functions: Keep `session: Session` parameter, ensure function uses `session.query()` directly (not `with session()`)
+3. For query functions: Keep `session: Session` parameter, ensure function uses `session.query()` directly (not `with session(engine)`)
 4. Verify return types: insert → str (ID), update/deactivate → bool, query → Model object(s)
-5. Check tests call functions correctly: insert/update/delete with `(model, engine)`, query with `(params, db_session, engine)` where `db_session` comes from `with session() as db_session:`
+5. Check tests call functions correctly: insert/update/delete with `(model, engine)`, query with `(params, db_session, engine)` where `db_session` comes from `with session(engine) as db_session:`
 
 **Test Factory Fixtures:**
 Factories in `tests/fixtures/db_model_fixtures.py` should accept optional parameters with auto-creation defaults:
@@ -114,7 +114,7 @@ Factories in `tests/fixtures/db_model_fixtures.py` should accept optional parame
 Tests must follow these patterns:
 1. Import session: `from common.service_connections.db_service.database.engine import get_database_session as session`
 2. For insert/update/deactivate: Call directly - `insert_model(model, engine)`  
-3. For queries: Wrap in session context - `with session() as db_session: result = query_model(id, db_session, engine)`
+3. For queries: Wrap in session context - `with session(engine) as db_session: result = query_model(id, db_session, engine)`
 4. Use factory-created IDs for foreign keys (never hardcoded strings like "admin")
 5. Factory parameters use `name` not model-specific names like `plan_name` or `suite_name`
 

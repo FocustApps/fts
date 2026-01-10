@@ -17,11 +17,11 @@ from app.routes.template_dataclasses import ViewRecordDataclass
 from common.fenrir_enums import EnvironmentEnum
 from common.service_connections.db_service.models.environment_model import (
     EnvironmentModel,
+    deactivate_environment_by_id,
     insert_environment,
     query_all_environments,
     query_environment_by_id,
     insert_environment,
-    drop_environment_by_id,
     update_environment_by_id,
 )
 from app.config import get_base_app_config
@@ -37,9 +37,10 @@ environments_templates = Jinja2Templates(directory=TEMPLATE_PATH)
 
 @env_views_router.get("/")
 async def get_environments(request: Request, token: str = Depends(verify_auth_token)):
-    environments = query_all_environments(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        environments = query_all_environments(session=db_session, engine=DB_ENGINE)
     for env in environments:
-        del env.status
+        del env.environment_status
         del env.created_at
         del env.updated_at
 
@@ -50,7 +51,14 @@ async def get_environments(request: Request, token: str = Depends(verify_auth_to
         ]
     else:
         # Default headers when no environments exist
-        headers = ["Id", "Name", "Environment Designation", "Url", "Api Url", "Users"]
+        headers = [
+            "Environment Id",
+            "Environment Name",
+            "Environment Designation",
+            "Environment Base Url",
+            "Api Base Url",
+            "Users In Environment",
+        ]
 
     return environments_templates.TemplateResponse(
         "table.html",
@@ -81,11 +89,12 @@ async def new_environment(request: Request, token: str = Depends(verify_auth_tok
 
 @env_views_router.get("/{record_id}")
 async def view_environment(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request, record_id: str, token: str = Depends(verify_auth_token)
 ):
-    environment = query_environment_by_id(
-        environment_id=record_id, engine=DB_ENGINE, session=Session
-    )
+    with Session(DB_ENGINE) as db_session:
+        environment = query_environment_by_id(
+            environment_id=record_id, session=db_session, engine=DB_ENGINE
+        )
     users = [user for user in environment.users]
     return environments_templates.TemplateResponse(
         "view_record.html",
@@ -101,14 +110,17 @@ async def view_environment(
 
 @env_views_router.patch("/{record_id}")
 async def view_updated_environment(
-    request: Request, record_id: int, environment: EnvironmentModel
+    request: Request, record_id: str, environment: EnvironmentModel
 ) -> EnvironmentModel:
-    updated_env = update_environment_by_id(
+    update_environment_by_id(
         environment_id=record_id,
         environment=environment,
         engine=DB_ENGINE,
-        session=Session,
     )
+    with Session(DB_ENGINE) as db_session:
+        updated_env = query_environment_by_id(
+            environment_id=record_id, session=db_session, engine=DB_ENGINE
+        )
     return environments_templates.TemplateResponse(
         "view_record.html",
         ViewRecordDataclass(
@@ -122,11 +134,12 @@ async def view_updated_environment(
 
 @env_views_router.get("/{record_id}/edit")
 def view_edit_environment(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request, record_id: str, token: str = Depends(verify_auth_token)
 ):
-    environment = query_environment_by_id(
-        environment_id=record_id, engine=DB_ENGINE, session=Session
-    )
+    with Session(DB_ENGINE) as db_session:
+        environment = query_environment_by_id(
+            environment_id=record_id, session=db_session, engine=DB_ENGINE
+        )
     return environments_templates.TemplateResponse(
         "/environments/env_edit.html",
         {
@@ -149,43 +162,51 @@ async def create_environment(
     environment: EnvironmentModel,
     token: str = Depends(verify_auth_token),
 ) -> EnvironmentModel:
-    return insert_environment(environment=environment, engine=DB_ENGINE, session=Session)
+    env_id = insert_environment(environment=environment, engine=DB_ENGINE)
+    with Session(DB_ENGINE) as db_session:
+        return query_environment_by_id(
+            environment_id=env_id, session=db_session, engine=DB_ENGINE
+        )
 
 
 @env_api_router.get("/")
 async def view_all_environments(
     request: Request, token: str = Depends(verify_auth_token)
 ):
-    return query_all_environments(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        return query_all_environments(session=db_session, engine=DB_ENGINE)
 
 
-@env_api_router.get("/{record_id}")
+@env_api_router.get("/{environment_id}")
 async def get_environment(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request, environment_id: str, token: str = Depends(verify_auth_token)
 ):
-    return query_environment_by_id(
-        environment_id=record_id, engine=DB_ENGINE, session=Session
-    )
+    with Session(DB_ENGINE) as db_session:
+        return query_environment_by_id(
+            environment_id=environment_id, session=db_session, engine=DB_ENGINE
+        )
 
 
-@env_api_router.patch("/{record_id}")
+@env_api_router.patch("/{environment_id}")
 async def update_environment(
     request: Request,
-    record_id: int,
+    environment_id: str,
     environment: EnvironmentModel,
     token: str = Depends(verify_auth_token),
 ) -> EnvironmentModel:
-    return update_environment_by_id(
-        environment_id=record_id,
+    update_environment_by_id(
+        environment_id=environment_id,
         environment=environment,
         engine=DB_ENGINE,
-        session=Session,
     )
+    with Session(DB_ENGINE) as db_session:
+        return query_environment_by_id(
+            environment_id=environment_id, session=db_session, engine=DB_ENGINE
+        )
 
 
-@env_api_router.delete("/{record_id}")
+@env_api_router.delete("/{environment_id}")
 async def delete_environment(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request, environment_id: str, token: str = Depends(verify_auth_token)
 ):
-    drop_environment_by_id(environment_id=record_id, engine=DB_ENGINE, session=Session)
-    return
+    return deactivate_environment_by_id(environment_id=environment_id, engine=DB_ENGINE)

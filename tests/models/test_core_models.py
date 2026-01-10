@@ -64,7 +64,7 @@ class TestSystemUnderTestCRUD:
         assert result.sut_id is not None
 
         # Query back
-        with session() as db_session:
+        with session(engine) as db_session:
             retrieved = query_system_under_test_by_id(result.sut_id, db_session, engine)
 
         assert retrieved is not None
@@ -96,7 +96,7 @@ class TestSystemUnderTestCRUD:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             account1_systems = query_systems_under_test_by_account(
                 account1, db_session, engine
             )
@@ -127,7 +127,7 @@ class TestSystemUnderTestCRUD:
 
         # Assert deactivated
         assert result is True
-        with session() as db_session:
+        with session(engine) as db_session:
             sut = query_system_under_test_by_id(sut_id, db_session, engine)
         assert sut.is_active is False
         assert sut.deactivated_by_user_id == deactivated_by
@@ -138,7 +138,7 @@ class TestSystemUnderTestCRUD:
 
         # Assert reactivated
         assert result is True
-        with session() as db_session:
+        with session(engine) as db_session:
             sut = query_system_under_test_by_id(sut_id, db_session, engine)
         assert sut.is_active is True
         assert sut.deactivated_at is None
@@ -169,7 +169,7 @@ class TestSystemUnderTestCRUD:
 
         # Assert
         assert result is True
-        with session() as db_session:
+        with session(engine) as db_session:
             sut = query_system_under_test_by_id(sut_id, db_session, engine)
         assert sut.system_name == "Updated Name"
 
@@ -203,7 +203,7 @@ class TestTestCaseCRUD:
         test_case_id = insert_test_case(test_case_model, engine)
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             retrieved = query_test_case_by_id(test_case_id, db_session, engine)
         assert retrieved.test_type == "functional"
 
@@ -244,7 +244,7 @@ class TestTestCaseCRUD:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             functional_tests = query_test_cases_by_type(
                 "functional", account_id, db_session, engine
             )
@@ -283,7 +283,7 @@ class TestTestCaseCRUD:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             web_tests = query_test_cases_by_sut(sut1, db_session, engine)
 
         # Assert
@@ -322,7 +322,7 @@ class TestSuiteCRUD:
         suite_id = insert_suite(suite_model, engine)
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             retrieved = query_suite_by_id(suite_id, db_session, engine)
         assert retrieved.suite_name == "Regression Suite"
         assert retrieved.description == "Full regression test suite"
@@ -363,7 +363,7 @@ class TestSuiteCRUD:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             account1_suites = query_suites_by_account(account1, db_session, engine)
 
         # Assert

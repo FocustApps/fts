@@ -43,14 +43,14 @@ class TestPurgeScheduleCRUD:
         )
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             schedule = query_purge_schedule_by_id(schedule_id, db_session, engine)
 
         assert schedule.table_name == "audit_logs"
         assert schedule.purge_interval_days == 90
 
     def test_query_purge_schedule_by_table(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test querying purge schedule for specific table."""
         # Arrange
@@ -59,7 +59,7 @@ class TestPurgeScheduleCRUD:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             schedule = query_purge_schedule_by_table(
                 table_name="test_executions",
                 db_session=db_session,
@@ -72,7 +72,7 @@ class TestPurgeScheduleCRUD:
         assert schedule.purge_interval_days == 30
 
     def test_query_all_purge_schedules(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test querying all purge schedules (system-wide, no multi-tenancy)."""
         # Arrange - Create 3 schedules
@@ -83,7 +83,7 @@ class TestPurgeScheduleCRUD:
         sched3 = purge_schedule_factory(table_name="table3", purge_interval_days=30)
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             all_schedules = query_all_purge_schedules(
                 db_session=db_session, engine=engine
             )
@@ -95,7 +95,7 @@ class TestPurgeScheduleCRUD:
         assert sched3 in schedule_ids
 
     def test_update_purge_schedule(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test updating retention days for a schedule."""
         # Arrange
@@ -112,13 +112,13 @@ class TestPurgeScheduleCRUD:
         # Assert
         assert result is True
 
-        with session() as db_session:
+        with session(engine) as db_session:
             schedule = query_purge_schedule_by_id(schedule_id, db_session, engine)
 
         assert schedule.purge_interval_days == 120
 
     def test_deactivate_purge_schedule(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test deleting a purge schedule."""
         # Arrange
@@ -131,7 +131,7 @@ class TestPurgeScheduleCRUD:
         assert result is True
 
         # Verify schedule was deleted
-        with session() as db_session:
+        with session(engine) as db_session:
             schedule = query_purge_schedule_by_id(schedule_id, db_session, engine)
 
         assert schedule is None
@@ -141,7 +141,7 @@ class TestPurgeDueCalculations:
     """Test calculations for tables due for purge."""
 
     def test_query_tables_due_for_purge(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test identifying tables that need purging based on last_purged_at."""
         # Arrange - Create schedules using factory
@@ -162,13 +162,13 @@ class TestPurgeDueCalculations:
             PurgeTable,
         )
 
-        with session() as db_session:
+        with session(engine) as db_session:
             overdue = db_session.get(PurgeTable, overdue_schedule)
             overdue.last_purged_at = datetime.now(timezone.utc) - timedelta(days=40)
             db_session.commit()
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             due_tables = query_tables_due_for_purge(db_session=db_session, engine=engine)
 
         # Assert
@@ -178,7 +178,7 @@ class TestPurgeDueCalculations:
         assert "current_table" not in due_table_names  # Not due yet (just purged)
 
     def test_update_last_purged_at_after_purge(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test updating last_purged_at timestamp after successful purge."""
         # Arrange
@@ -201,7 +201,7 @@ class TestPurgeDueCalculations:
         # Assert
         assert result is True
 
-        with session() as db_session:
+        with session(engine) as db_session:
             schedule = query_purge_schedule_by_id(schedule_id, db_session, engine)
 
         assert schedule.last_purged_at is not None
@@ -213,7 +213,7 @@ class TestPurgeScheduleSummary:
     """Test purge schedule summary with next_purge_date calculations."""
 
     def test_get_purge_schedule_summary(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test getting summary with calculated next purge dates."""
         # Arrange - Create schedules
@@ -233,13 +233,13 @@ class TestPurgeScheduleSummary:
         )
 
         # Update schedule1 to be purged 15 days ago
-        with session() as db_session:
+        with session(engine) as db_session:
             sched1 = db_session.get(PurgeTable, schedule1)
             sched1.last_purged_at = datetime.now(timezone.utc) - timedelta(days=15)
             db_session.commit()
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             summary = get_purge_schedule_summary(db_session=db_session, engine=engine)
 
         # Assert
@@ -257,7 +257,7 @@ class TestPurgeScheduleSummary:
         assert not logs_summary["is_due_for_purge"]  # Not due yet
 
     def test_summary_includes_metadata(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test that summary includes all relevant metadata."""
         # Arrange
@@ -266,7 +266,7 @@ class TestPurgeScheduleSummary:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             summary = get_purge_schedule_summary(db_session=db_session, engine=engine)
 
         # Assert
@@ -311,7 +311,7 @@ class TestRetentionPolicyEdgeCases:
             )
 
     def test_very_long_retention_period(
-        self, purge_schedule_factory, engine: Engine, session: Session
+        self, purge_schedule_factory, engine: Engine
     ):
         """Test handling of very long retention periods (e.g., 10 years)."""
         # Act - 10 year retention
@@ -321,7 +321,7 @@ class TestRetentionPolicyEdgeCases:
         )
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             schedule = query_purge_schedule_by_id(schedule_id, db_session, engine)
 
         assert schedule.purge_interval_days == 3650

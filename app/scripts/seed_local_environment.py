@@ -21,7 +21,6 @@ import time
 import logging
 import requests
 import asyncio
-from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
@@ -29,9 +28,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from common.selenium_documentation import get_selenium_controller_methods_documentation
 from app.config import get_config
 from app.services.multi_user_auth_service import get_multi_user_auth_service
+from common.service_connections.db_service.db_manager import DB_ENGINE
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +43,8 @@ BASE_URL = "http://localhost:8080"
 API_VERSION = "v1"
 MAX_RETRIES = 3
 RETRY_DELAY = 2
+
+engine = DB_ENGINE
 
 
 class SeedingError(Exception):
@@ -373,36 +374,36 @@ def seed_environments(client: APIClient) -> List[Dict[str, Any]]:
 
     sample_environments = [
         {
-            "name": "Development",
+            "environment_name": "Development",
             "environment_designation": "dev",
-            "url": "https://dev.example.com",
-            "api_url": "https://api-dev.example.com",
-            "status": True,
-            "users": [],
+            "environment_base_url": "https://dev.example.com",
+            "api_base_url": "https://api-dev.example.com",
+            "environment_status": "active",
+            "users_in_environment": [],
         },
         {
-            "name": "Staging",
+            "environment_name": "Staging",
             "environment_designation": "staging",
-            "url": "https://staging.example.com",
-            "api_url": "https://api-staging.example.com",
-            "status": True,
-            "users": [],
+            "environment_base_url": "https://staging.example.com",
+            "api_base_url": "https://api-staging.example.com",
+            "environment_status": "active",
+            "users_in_environment": [],
         },
         {
-            "name": "QA Testing",
+            "environment_name": "QA Testing",
             "environment_designation": "qa",
-            "url": "https://qa.example.com",
-            "api_url": "https://api-qa.example.com",
-            "status": True,
-            "users": [],
+            "environment_base_url": "https://qa.example.com",
+            "api_base_url": "https://api-qa.example.com",
+            "environment_status": "active",
+            "users_in_environment": [],
         },
         {
-            "name": "Local Development",
+            "environment_name": "Local Development",
             "environment_designation": "local",
-            "url": "http://localhost:3000",
-            "api_url": "http://localhost:8080",
-            "status": True,
-            "users": [],
+            "environment_base_url": "http://localhost:3000",
+            "api_base_url": "http://localhost:8080",
+            "environment_status": "active",
+            "users_in_environment": [],
         },
     ]
 
@@ -410,21 +411,25 @@ def seed_environments(client: APIClient) -> List[Dict[str, Any]]:
 
     for env_data in sample_environments:
         try:
-            logger.info(f"Creating environment: {env_data['name']}")
+            logger.info(f"Creating environment: {env_data['environment_name']}")
             result = client.post("/v1/env/api/", env_data)
             created_environments.append(result)
             logger.info(
-                f"✓ Environment '{env_data['name']}' created with ID: {result.get('id')}"
+                f"✓ Environment '{env_data['environment_name']}' created with ID: {result.get('environment_id')}"
             )
 
         except SeedingError as e:
             if "already exists" in str(e).lower():
-                logger.info(f"Environment '{env_data['name']}' already exists, skipping")
+                logger.info(
+                    f"Environment '{env_data['environment_name']}' already exists, skipping"
+                )
             else:
-                logger.error(f"Failed to create environment '{env_data['name']}': {e}")
+                logger.error(
+                    f"Failed to create environment '{env_data['environment_name']}': {e}"
+                )
         except Exception as e:
             logger.error(
-                f"Unexpected error creating environment '{env_data['name']}': {e}"
+                f"Unexpected error creating environment '{env_data['environment_name']}': {e}"
             )
 
     logger.info(
@@ -552,50 +557,42 @@ def seed_pages(
     if not env_names:
         env_names = ["dev"]  # fallback
 
-    current_time = datetime.now().isoformat()
-
     sample_pages = [
         {
             "page_name": "Login Page",
             "page_url": "https://app.example.com/login",
-            "created_at": current_time,
+            "environments": {"dev": True, "staging": True},  # JSONB dict format
             "identifiers": [],
-            "environments": env_names[:2],  # First two environments
         },
         {
             "page_name": "Dashboard",
             "page_url": "https://app.example.com/dashboard",
-            "created_at": current_time,
+            "environments": {env: True for env in env_names},  # All environments
             "identifiers": [],
-            "environments": env_names,
         },
         {
             "page_name": "User Profile",
             "page_url": "https://app.example.com/profile",
-            "created_at": current_time,
+            "environments": {"dev": True, "staging": True, "qa": True},
             "identifiers": [],
-            "environments": env_names[:3],  # First three environments
         },
         {
             "page_name": "Settings Page",
             "page_url": "https://app.example.com/settings",
-            "created_at": current_time,
+            "environments": {"dev": True, "staging": True},
             "identifiers": [],
-            "environments": ["dev", "staging"],  # Specific environments
         },
         {
             "page_name": "Admin Panel",
             "page_url": "https://app.example.com/admin",
-            "created_at": current_time,
+            "environments": {"staging": True, "qa": True},
             "identifiers": [],
-            "environments": ["staging", "qa"],  # Admin only in staging/qa
         },
         {
             "page_name": "Reports Page",
             "page_url": "https://app.example.com/reports",
-            "created_at": current_time,
+            "environments": {env: True for env in env_names},
             "identifiers": [],
-            "environments": env_names,
         },
     ]
 
@@ -607,7 +604,7 @@ def seed_pages(
             result = client.post("/v1/api/pages/", page_data)
             created_pages.append(result)
             logger.info(
-                f"✓ Page '{page_data['page_name']}' created with ID: {result.get('id')}"
+                f"✓ Page '{page_data['page_name']}' created with ID: {result.get('page_id')}"
             )
 
         except SeedingError as e:
@@ -649,22 +646,16 @@ def seed_identifiers(
                 "element_name": "username_field",
                 "locator_strategy": "id",
                 "locator_query": "username",
-                "action": "type",
-                "environments": ["dev", "staging", "qa"],
             },
             {
                 "element_name": "password_field",
                 "locator_strategy": "id",
                 "locator_query": "password",
-                "action": "type",
-                "environments": ["dev", "staging", "qa"],
             },
             {
                 "element_name": "login_button",
                 "locator_strategy": "xpath",
                 "locator_query": "//button[@type='submit' and contains(text(), 'Login')]",
-                "action": "click",
-                "environments": ["dev", "staging", "qa"],
             },
         ],
         "Dashboard": [
@@ -672,22 +663,16 @@ def seed_identifiers(
                 "element_name": "welcome_message",
                 "locator_strategy": "css",
                 "locator_query": ".welcome-message h1",
-                "action": "get_text",
-                "environments": ["dev", "staging", "qa", "local"],
             },
             {
                 "element_name": "navigation_menu",
                 "locator_strategy": "css",
                 "locator_query": "nav.main-menu",
-                "action": "verify_visible",
-                "environments": ["dev", "staging", "qa", "local"],
             },
             {
                 "element_name": "user_profile_link",
                 "locator_strategy": "xpath",
                 "locator_query": "//a[contains(@href, '/profile')]",
-                "action": "click",
-                "environments": ["dev", "staging", "qa"],
             },
         ],
         "User Profile": [
@@ -695,15 +680,11 @@ def seed_identifiers(
                 "element_name": "edit_profile_button",
                 "locator_strategy": "css",
                 "locator_query": "button.edit-profile",
-                "action": "click",
-                "environments": ["dev", "staging"],
             },
             {
                 "element_name": "email_field",
                 "locator_strategy": "name",
                 "locator_query": "email",
-                "action": "type",
-                "environments": ["dev", "staging", "qa"],
             },
         ],
         "Settings Page": [
@@ -711,8 +692,6 @@ def seed_identifiers(
                 "element_name": "save_settings_button",
                 "locator_strategy": "css",
                 "locator_query": "button[type='submit'].save-settings",
-                "action": "click",
-                "environments": ["dev", "staging"],
             }
         ],
         "Admin Panel": [
@@ -720,15 +699,11 @@ def seed_identifiers(
                 "element_name": "admin_dashboard_title",
                 "locator_strategy": "tag",
                 "locator_query": "h1",
-                "action": "verify_text",
-                "environments": ["staging", "qa"],
             },
             {
                 "element_name": "user_management_link",
                 "locator_strategy": "xpath",
                 "locator_query": "//a[contains(text(), 'User Management')]",
-                "action": "click",
-                "environments": ["staging", "qa"],
             },
         ],
         "Reports Page": [
@@ -736,15 +711,11 @@ def seed_identifiers(
                 "element_name": "generate_report_button",
                 "locator_strategy": "css",
                 "locator_query": "button.generate-report",
-                "action": "click",
-                "environments": ["dev", "staging", "qa", "local"],
             },
             {
                 "element_name": "date_filter",
                 "locator_strategy": "id",
                 "locator_query": "date-range-picker",
-                "action": "type",
-                "environments": ["dev", "staging", "qa"],
             },
         ],
     }
@@ -753,7 +724,7 @@ def seed_identifiers(
 
     for page in pages:
         page_name = page.get("page_name")
-        page_id = page.get("id")
+        page_id = page.get("page_id")
 
         if not page_id or not page_name:
             logger.warning(f"Page missing required fields: {page}")
@@ -766,7 +737,6 @@ def seed_identifiers(
             identifier_data = {
                 **identifier_template,
                 "page_id": page_id,
-                "created_at": None,  # Will be auto-generated
             }
 
             try:
@@ -776,7 +746,7 @@ def seed_identifiers(
                 result = client.post("/v1/api/identifiers/", identifier_data)
                 created_identifiers.append(result)
                 logger.info(
-                    f"✓ Identifier '{identifier_data['element_name']}' created with ID: {result.get('id')}"
+                    f"✓ Identifier '{identifier_data['element_name']}' created with ID: {result.get('identifier_id')}"
                 )
 
             except SeedingError as e:
@@ -803,49 +773,51 @@ def seed_actions(client: APIClient) -> List[Dict[str, Any]]:
     """
     Seed SeleniumController method documentation as actions.
 
-    This function extracts all public methods from the SeleniumController class
-    and creates action records with their documentation for easy reference.
+    NOTE: Temporarily disabled due to JSON serialization issues with MethodDocumentation objects.
+    The action_chain_model expects different data structure than what selenium_documentation returns.
 
     Returns:
-        List of created action records
+        Empty list (seeding disabled)
     """
-    logger.info("Seeding actions from SeleniumController documentation...")
+    logger.info("Actions seeding temporarily disabled - requires data structure update")
+    return []
 
-    try:
-        # Get selenium controller method documentation
-        selenium_methods = get_selenium_controller_methods_documentation()
-        logger.info(f"Found {len(selenium_methods)} SeleniumController methods to seed")
-
-        created_actions = []
-
-        for method_name, documentation in selenium_methods.items():
-            action_data = {
-                "action_method": method_name,
-                "action_documentation": documentation,
-            }
-
-            try:
-                logger.info(f"Creating action: {method_name}")
-                result = client.post("/v1/api/actions/", action_data)
-                created_actions.append(result)
-                logger.info(
-                    f"✓ Action '{method_name}' created with ID: {result.get('id')}"
-                )
-
-            except SeedingError as e:
-                if "already exists" in str(e).lower():
-                    logger.info(f"Action '{method_name}' already exists, skipping")
-                else:
-                    logger.error(f"Failed to create action '{method_name}': {e}")
-            except Exception as e:
-                logger.error(f"Unexpected error creating action '{method_name}': {e}")
-
-        logger.info(f"Action seeding completed. Created {len(created_actions)} actions.")
-        return created_actions
-
-    except Exception as e:
-        logger.error(f"Failed to seed actions: {e}")
-        return []
+    # DISABLED CODE BELOW - needs refactoring
+    # try:
+    #     # Get selenium controller method documentation
+    #     selenium_methods = get_selenium_controller_methods_documentation()
+    #     logger.info(f"Found {len(selenium_methods)} SeleniumController methods to seed")
+    #
+    #     created_actions = []
+    #
+    #     for method_name, documentation in selenium_methods.items():
+    #         action_data = {
+    #             "action_method": method_name,
+    #             "action_documentation": documentation,
+    #         }
+    #
+    #         try:
+    #             logger.info(f"Creating action: {method_name}")
+    #             result = client.post("/v1/api/actions/", action_data)
+    #             created_actions.append(result)
+    #             logger.info(
+    #                 f"✓ Action '{method_name}' created with ID: {result.get('id')}"
+    #             )
+    #
+    #         except SeedingError as e:
+    #             if "already exists" in str(e).lower():
+    #                 logger.info(f"Action '{method_name}' already exists, skipping")
+    #             else:
+    #                 logger.error(f"Failed to create action '{method_name}': {e}")
+    #         except Exception as e:
+    #             logger.error(f"Unexpected error creating action '{method_name}': {e}")
+    #
+    #     logger.info(f"Action seeding completed. Created {len(created_actions)} actions.")
+    #     return created_actions
+    #
+    # except Exception as e:
+    #     logger.error(f"Failed to seed actions: {e}")
+    #     return []
 
 
 def main():

@@ -78,7 +78,7 @@ def insert_suite(suite: SuiteModel, engine: Engine) -> str:
         suite.suite_id = None
         logging.warning("Suite ID will only be set by the system")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         suite.created_at = datetime.now(timezone.utc)
         db_suite = SuiteTable(**suite.model_dump())
         db_session.add(db_suite)
@@ -100,7 +100,7 @@ def query_suite_by_id(suite_id: str, session: Session, engine: Engine) -> SuiteM
 
 def query_all_suites(session: Session, engine: Engine) -> List[SuiteModel]:
     """Retrieve all active suites."""
-    with session() as db_session:
+    with session(engine) as db_session:
         suites = db_session.query(SuiteTable).filter(SuiteTable.is_active == True).all()
         return [SuiteModel(**suite.__dict__) for suite in suites]
 
@@ -109,7 +109,7 @@ def update_suite_by_id(
     suite_id: str, suite: SuiteModel, session: Session, engine: Engine
 ) -> SuiteModel:
     """Update an existing suite."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")
@@ -128,7 +128,7 @@ def update_suite_by_id(
 
 def drop_suite_by_id(suite_id: str, session: Session, engine: Engine) -> int:
     """Hard delete a suite (use with caution - prefer soft delete)."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")
@@ -158,7 +158,7 @@ def query_suites_by_owner(
     owner_user_id: str, session: Session, engine: Engine
 ) -> List[SuiteModel]:
     """Query active suites owned by a specific user."""
-    with session() as db_session:
+    with session(engine) as db_session:
         suites = (
             db_session.query(SuiteTable)
             .filter(SuiteTable.owner_user_id == owner_user_id)
@@ -172,7 +172,7 @@ def query_suites_by_sut(
     sut_id: str, session: Session, engine: Engine
 ) -> List[SuiteModel]:
     """Query active suites for a specific system under test."""
-    with session() as db_session:
+    with session(engine) as db_session:
         suites = (
             db_session.query(SuiteTable)
             .filter(SuiteTable.sut_id == sut_id)
@@ -186,7 +186,7 @@ def deactivate_suite_by_id(
     suite_id: str, deactivated_by_user_id: str, session: Session, engine: Engine
 ) -> SuiteModel:
     """Soft delete a suite."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")
@@ -203,7 +203,7 @@ def deactivate_suite_by_id(
 
 def reactivate_suite_by_id(suite_id: str, session: Session, engine: Engine) -> SuiteModel:
     """Reactivate a soft-deleted suite."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")

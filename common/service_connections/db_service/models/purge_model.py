@@ -88,7 +88,7 @@ def insert_purge_schedule(model: PurgeModel, engine: Engine) -> str:
     """
     purge_dict = model.model_dump(exclude_unset=True)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Check if schedule already exists for this table
         existing = (
             db_session.query(PurgeTable)
@@ -152,7 +152,7 @@ def update_purge_schedule(purge_id: str, updates: PurgeModel, engine: Engine) ->
     # Add updated_at timestamp
     update_dict["updated_at"] = datetime.now(timezone.utc)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = db_session.get(PurgeTable, purge_id)
         if not purge:
             return False
@@ -177,7 +177,7 @@ def drop_purge_schedule(purge_id: str, engine: Engine) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = db_session.get(PurgeTable, purge_id)
         if not purge:
             return False
@@ -249,7 +249,7 @@ def update_last_purged_at(
     if purged_at is None:
         purged_at = datetime.now(timezone.utc)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = db_session.get(PurgeTable, purge_id)
         if not purge:
             return False
@@ -282,7 +282,7 @@ def update_purge_interval(
             f"Invalid purge interval {new_interval_days}. Must be 1-3650 days."
         )
 
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = (
             db_session.query(PurgeTable)
             .filter(PurgeTable.table_name == table_name)

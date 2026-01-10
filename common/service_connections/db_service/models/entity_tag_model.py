@@ -295,7 +295,7 @@ def insert_entity_tag(model: EntityTagModel, engine: Engine) -> str:
     """
     tag_dict = model.model_dump(exclude_unset=True)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         new_tag = EntityTagTable(**tag_dict)
         db_session.add(new_tag)
         db_session.commit()
@@ -352,7 +352,7 @@ def update_entity_tag(tag_id: str, updates: EntityTagModel, engine: Engine) -> b
     """
     update_dict = updates.model_dump(exclude_unset=True)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -374,7 +374,7 @@ def drop_entity_tag(tag_id: str, engine: Engine, db_session: Session) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -397,7 +397,7 @@ def deactivate_entity_tag(
     Returns:
         True if deactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -420,7 +420,7 @@ def reactivate_entity_tag(tag_id: str, engine: Engine, db_session: Session) -> b
     Returns:
         True if reactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -459,7 +459,7 @@ def query_tags_for_entity(
     Returns:
         List of EntityTagModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(EntityTagTable).filter(
             and_(
                 EntityTagTable.entity_type == entity_type,
@@ -615,7 +615,7 @@ def add_tags_to_entity(
     tag_ids = []
     tag_values = tag_values or {}
 
-    with session() as db_session:
+    with session(engine) as db_session:
         for tag_name in tag_names:
             tag_model = EntityTagModel(
                 entity_type=entity_type,
@@ -669,7 +669,7 @@ def replace_entity_tags(
     result = {"deactivated": [], "created": []}
     tag_values = tag_values or {}
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Deactivate existing tags
         existing_tags = (
             db_session.query(EntityTagTable)

@@ -92,7 +92,7 @@ def add_suite_to_plan(
         is_active=is_enabled,
     )
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify plan exists
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
@@ -133,7 +133,7 @@ def remove_suite_from_plan(
     Raises:
         SQLAlchemyError: If database operation fails
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         assoc = (
             db_session.query(PlanSuiteAssociation)
             .filter(
@@ -174,7 +174,7 @@ def reorder_plan_suites(
         ValueError: If suite IDs don't match existing associations
         SQLAlchemyError: If database operation fails
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         # Get all active associations for plan
         assocs = (
             db_session.query(PlanSuiteAssociation)
@@ -232,7 +232,7 @@ def update_suite_execution_order(
     if new_execution_order < 0:
         raise ValueError(f"execution_order must be >= 0, got {new_execution_order}")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         assoc = (
             db_session.query(PlanSuiteAssociation)
             .filter(
@@ -271,7 +271,7 @@ def query_plan_with_suites(
     Returns:
         PlanWithSuitesModel with populated suites list, or None if plan not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         # Get plan
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
@@ -333,7 +333,7 @@ def query_suites_for_plan(
     Returns:
         List of suite_id strings in execution order
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = (
             db_session.query(PlanSuiteAssociation.suite_id)
             .filter(PlanSuiteAssociation.plan_id == plan_id)
@@ -361,7 +361,7 @@ def query_plans_for_suite(
     Returns:
         List of plan_id strings
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(PlanSuiteAssociation.plan_id).filter(
             PlanSuiteAssociation.suite_id == suite_id
         )
@@ -387,7 +387,7 @@ def get_plan_suite_count(
     Returns:
         Number of suites in plan
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(func.count(PlanSuiteAssociation.association_id)).filter(
             PlanSuiteAssociation.plan_id == plan_id
         )
@@ -426,7 +426,7 @@ def bulk_add_suites_to_plan(
     """
     assoc_ids = []
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify plan exists
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
@@ -475,7 +475,7 @@ def replace_plan_suites(
     """
     result = {"removed": [], "added": []}
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify plan exists
         plan = db_session.get(PlanTable, plan_id)
         if not plan:

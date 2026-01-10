@@ -49,7 +49,7 @@ class TestAuditLogInsertOnly:
         )
 
         # Assert - Query using the audit_id directly
-        with session() as db_session:
+        with session(engine) as db_session:
             from common.service_connections.db_service.database.tables.audit_log import (
                 AuditLogTable,
             )
@@ -98,7 +98,7 @@ class TestAuditLogInsertOnly:
         )
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             log = db_session.query(AuditLogTable).filter_by(audit_id=log_id).first()
 
         assert log.details is not None
@@ -175,7 +175,7 @@ class TestAuditChangeModelJSONB:
         )
 
         # Assert
-        with session() as db_session:
+        with session(engine) as db_session:
             log = db_session.query(AuditLogTable).filter_by(audit_id=log_id).first()
 
         assert isinstance(log.details["old_value"], dict)
@@ -217,7 +217,7 @@ class TestAuditLogQueries:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             logs = query_audit_logs_by_entity(
                 entity_type="suite",
                 entity_id=entity_id,
@@ -260,7 +260,7 @@ class TestAuditLogQueries:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             account1_logs = query_audit_logs_by_account(
                 account_id=account1, session=db_session, engine=engine
             )
@@ -305,7 +305,7 @@ class TestAuditLogQueries:
         )
 
         # Act
-        with session() as db_session:
+        with session(engine) as db_session:
             user_alpha_logs = query_audit_logs_by_user(
                 user_id=user_alpha,
                 session=db_session,
@@ -352,7 +352,7 @@ class TestAuditLogQueries:
         )
 
         # Act - Query all logs and filter by sensitivity
-        with session() as db_session:
+        with session(engine) as db_session:
             all_logs = query_audit_logs_by_account(
                 account_id=account_id,
                 session=db_session,
@@ -397,7 +397,7 @@ class TestBulkAuditOperations:
         # Assert
         assert len(log_ids) == 5
 
-        with session() as db_session:
+        with session(engine) as db_session:
             logs = query_audit_logs_by_account(
                 account_id=account_id, session=db_session, engine=engine
             )

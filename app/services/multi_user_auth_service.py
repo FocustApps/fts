@@ -19,7 +19,8 @@ from app.config import get_base_app_config, get_storage_config
 from common.service_connections.db_service.database import (
     get_database_session,
 )
-from common.service_connections.db_service.models.auth_user_model import (
+from common.service_connections.db_service.db_manager import DB_ENGINE
+from common.service_connections.db_service.models.account_models.auth_user_model import (
     AuthUserModel,
     insert_auth_user,
     query_auth_user_by_email,
@@ -81,7 +82,7 @@ class MultiUserAuthService:
         """
         Adapter to execute auth_user_model functions with current session management.
 
-        Converts get_database_session() context manager pattern to
+        Converts get_database_session(engine) context manager pattern to
         session factory + engine pattern expected by auth_user_model functions.
 
         Args:
@@ -96,13 +97,8 @@ class MultiUserAuthService:
             SQLAlchemyError: If database operation fails
         """
         try:
-            with get_database_session() as session:
-                # Get the session class and engine from the active session
-                session_class = session.__class__
-                engine = session.bind
-
-                # Call the auth_user_model function with session class and engine
-                return func(*args, session=session_class, engine=engine, **kwargs)
+            # Call the auth_user_model function with get_database_session and DB_ENGINE
+            return func(*args, session=get_database_session, engine=DB_ENGINE, **kwargs)
 
         except Exception as e:
             logger.error(f"Error executing auth_user_model function {func.__name__}: {e}")

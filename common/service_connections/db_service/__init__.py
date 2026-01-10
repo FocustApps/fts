@@ -1,13 +1,17 @@
 # Legacy model imports (for backward compatibility)
-from common.service_connections.db_service.models.identifier_model import IdentifierTable
-from common.service_connections.db_service.models.user_model import (
+from common.service_connections.db_service.database.tables.action_tables.user_interface_action.identifier import (
+    IdentifierTable,
+)
+from common.service_connections.db_service.database.tables.system_under_test_user import (
     SystemUnderTestUserTable,
 )
-from common.service_connections.db_service.models.environment_model import (
+from common.service_connections.db_service.database.tables.environment import (
     EnvironmentTable,
 )
-from common.service_connections.db_service.models.page_model import PageTable
-from common.service_connections.db_service.models.email_processor_model import (
+from common.service_connections.db_service.database.tables.action_tables.user_interface_action.page import (
+    PageTable,
+)
+from common.service_connections.db_service.database.tables.email_processor import (
     EmailProcessorTable,
 )
 

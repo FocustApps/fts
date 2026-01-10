@@ -21,7 +21,7 @@ from common.service_connections.db_service.models.environment_model import (
     query_all_environments,
     update_environment_by_id,
 )
-from common.service_connections.db_service.models.user_model import (
+from common.service_connections.db_service.models.account_models.user_model import (
     UserModel,
     insert_user,
     query_all_users,
@@ -40,7 +40,8 @@ user_templates = Jinja2Templates(directory=TEMPLATE_PATH)
 
 @user_views_router.get("/", response_class=HTMLResponse)
 async def get_users(request: Request):
-    users: List[UserModel] = query_all_users(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        users: List[UserModel] = query_all_users(session=db_session, engine=DB_ENGINE)
     for user in users:
         del user.created_at
         del user.updated_at
@@ -53,7 +54,7 @@ async def get_users(request: Request):
     else:
         # Default headers when no users exist
         headers = [
-            "Id",
+            "Sut User Id",
             "Username",
             "Email",
             "Secret Url",
@@ -78,7 +79,8 @@ async def get_users(request: Request):
 
 @user_views_router.get("/{record_id}", response_class=HTMLResponse)
 async def view_user(request: Request, record_id: int):
-    user = query_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        user = query_user_by_id(user_id=record_id, session=db_session, engine=DB_ENGINE)
     user.password = len(user.password) * "*"
     return user_templates.TemplateResponse(
         "view_record.html",
@@ -93,7 +95,8 @@ async def view_user(request: Request, record_id: int):
 
 @user_views_router.get("/new/", response_class=HTMLResponse)
 async def new_user_view(request: Request):
-    environments = query_all_environments(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        environments = query_all_environments(session=db_session, engine=DB_ENGINE)
     return user_templates.TemplateResponse(
         "users/user_new.html",
         {
@@ -107,9 +110,7 @@ async def new_user_view(request: Request):
 
 @user_views_router.patch("/{record_id}", response_class=HTMLResponse)
 async def update_user(request: Request, record_id: int, user: UserModel) -> UserModel:
-    updated_user = update_user_by_id(
-        user_id=record_id, user=user, engine=DB_ENGINE, session=Session
-    )
+    updated_user = update_user_by_id(user_id=record_id, user=user, engine=DB_ENGINE)
     updated_user.password = len(updated_user.password) * "*"
     return user_templates.TemplateResponse(
         "view_record.html", {"request": request, "user": updated_user.model_dump()}
@@ -118,7 +119,8 @@ async def update_user(request: Request, record_id: int, user: UserModel) -> User
 
 @user_views_router.get("/{record_id}/edit", response_class=HTMLResponse)
 async def edit_user(request: Request, record_id: int):
-    user = query_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        user = query_user_by_id(user_id=record_id, session=db_session, engine=DB_ENGINE)
     user.password = len(user.password) * "*"
     return user_templates.TemplateResponse(
         "users/user_edit.html",
@@ -139,26 +141,29 @@ user_api_router = APIRouter(prefix="/user/api", tags=["user"], include_in_schema
 def create_user(
     request: Request, user: UserModel, token: str = Depends(verify_auth_token)
 ) -> UserModel:
-    new_user = insert_user(user=user, engine=DB_ENGINE, session=Session)
+    user_id = insert_user(user=user, engine=DB_ENGINE)
+    with Session(DB_ENGINE) as db_session:
+        new_user = query_user_by_id(user_id=user_id, session=db_session, engine=DB_ENGINE)
     update_environment_by_id(
         environment_id=user.environment_id,
         environment=EnvironmentModel(users=[new_user]),
         engine=DB_ENGINE,
-        session=Session,
     )
     return new_user
 
 
 @user_api_router.get("/all-users")
 def get_all_users(request: Request, token: str = Depends(verify_auth_token)):
-    return query_all_users(engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        return query_all_users(session=db_session, engine=DB_ENGINE)
 
 
 @user_api_router.get("/user/{record_id}")
 def get_user_by_id(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
-    return query_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
+    with Session(DB_ENGINE) as db_session:
+        return query_user_by_id(user_id=record_id, session=db_session, engine=DB_ENGINE)
 
 
 @user_api_router.put("/user/{record_id}")
@@ -168,11 +173,11 @@ def update_user(
     user: UserModel,
     token: str = Depends(verify_auth_token),
 ):
-    return update_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
+    return update_user_by_id(user_id=record_id, user=user, engine=DB_ENGINE)
 
 
 @user_api_router.delete("/user/{record_id}")
 def delete_user_by_id(
     request: Request, record_id: int, token: str = Depends(verify_auth_token)
 ):
-    return drop_user_by_id(user_id=record_id, engine=DB_ENGINE, session=Session)
+    return drop_user_by_id(user_id=record_id, engine=DB_ENGINE)
