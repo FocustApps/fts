@@ -4,13 +4,15 @@ Authentication routes for login/logout functionality.
 Provides web interface for token-based authentication with session management.
 """
 
-from fastapi import APIRouter, Request, Form, HTTPException, Depends, Response
+from fastapi import APIRouter, Request, Form, HTTPException, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.status import HTTP_302_FOUND, HTTP_401_UNAUTHORIZED
 
 from app.config import get_config
-from app.dependencies.multi_user_auth_dependency import verify_multi_user_auth_token
+
+# NOTE: Legacy multi-user auth dependency removed - migrate to JWT
+# from app.dependencies.multi_user_auth_dependency import verify_multi_user_auth_token
 from common.app_logging import create_logging
 
 logger = create_logging()
@@ -175,23 +177,24 @@ async def view_logout(request: Request):
     return response
 
 
-@auth_api_router.get("/status")
-async def auth_status(
-    request: Request, auth_context=Depends(verify_multi_user_auth_token)
-):
-    """
-    Check authentication status.
-
-    Returns user information if authenticated.
-    """
-    return {
-        "authenticated": True,
-        "token_valid": True,
-        "user_email": auth_context.user_email,
-        "username": auth_context.username,
-        "is_admin": auth_context.is_admin,
-        "client_ip": request.client.host,
-    }
+# TODO: Migrate to JWT authentication
+# @auth_api_router.get("/status")
+# async def auth_status(
+#     request: Request, auth_context=Depends(verify_multi_user_auth_token)
+# ):
+#     """
+#     Check authentication status.
+#
+#     Returns user information if authenticated.
+#     """
+#     return {
+#         "authenticated": True,
+#         "token_valid": True,
+#         "user_email": auth_context.user_email,
+#         "username": auth_context.username,
+#         "is_admin": auth_context.is_admin,
+#         "client_ip": request.client.host,
+#     }
 
 
 @auth_views_router.get("/status")

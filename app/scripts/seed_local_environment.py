@@ -20,7 +20,6 @@ import sys
 import time
 import logging
 import requests
-import asyncio
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
@@ -29,7 +28,6 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from app.config import get_config
-from app.services.multi_user_auth_service import get_multi_user_auth_service
 from common.service_connections.db_service.db_manager import DB_ENGINE
 
 # Configure logging
@@ -39,7 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-BASE_URL = "http://localhost:8080"
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8080")
 API_VERSION = "v1"
 MAX_RETRIES = 3
 RETRY_DELAY = 2
@@ -54,17 +52,20 @@ class SeedingError(Exception):
 
 
 class APIClient:
-    """HTTP client for making API requests to the Fenrir application."""
+    """HTTP client for making API requests to the Fenrir application with JWT auth."""
 
     def __init__(self, base_url: str, auth_token: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
         self.auth_token = auth_token
         self.session = requests.Session()
 
-        # Set default headers
+        # Set default headers for JWT authentication
         if self.auth_token:
             self.session.headers.update(
-                {"X-Auth-Token": self.auth_token, "Content-Type": "application/json"}
+                {
+                    "Authorization": f"Bearer {self.auth_token}",
+                    "Content-Type": "application/json",
+                }
             )
 
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
@@ -118,59 +119,64 @@ class APIClient:
 
 def get_auth_token() -> str:
     """
-    Retrieve authentication token for multi-user auth system.
+    Retrieve JWT access token by logging in with admin credentials.
 
-    For local development, generates a token for the admin user to seed data.
+    For local development, uses credentials from .env or defaults.
     """
     # First, try to get token from environment variable (for testing)
-    token = os.getenv("FENRIR_AUTH_TOKEN")
+    token = os.getenv("FENRIR_JWT_TOKEN")
     if token:
-        logger.info("Using auth token from environment variable")
+        logger.info("Using JWT token from environment variable")
         return token
 
-    # Generate a token for the admin user using the multi-user auth service
+    # Get admin credentials from config
     try:
-        # Add the project root to the path
-        project_root = Path("/fenrir")
-        sys.path.insert(0, str(project_root))
+        config = get_config()
+        admin_email = config.email_recipient
 
-        async def get_admin_token():
-            """Generate a token for the admin user."""
-            try:
-                # Get configuration
-                config = get_config()
-                admin_email = config.email_recipient
+        if not admin_email:
+            logger.warning(
+                "EMAIL_RECIPIENT not set in .env, using default admin@example.com"
+            )
+            admin_email = "admin@example.com"
 
-                if not admin_email:
-                    logger.error("EMAIL_RECIPIENT not found in .env file")
-                    return None
+        # For local development, use env variable or default password
+        # Default matches the password used in seed_admin_user.py
+        admin_password = os.getenv("ADMIN_PASSWORD", "Admin123!")
 
-                # Get auth service
-                auth_service = get_multi_user_auth_service()
+        logger.info(f"Attempting to login as: {admin_email}")
 
-                # Generate token for admin user (without sending email)
-                token = await auth_service.generate_user_token(
-                    admin_email, send_email=False
-                )
+        # Call JWT login endpoint
+        login_response = requests.post(
+            f"{BASE_URL}/v1/api/auth/login",
+            json={
+                "email": admin_email,
+                "password": admin_password,
+            },
+            timeout=10,
+        )
 
-                logger.info(f"Generated multi-user auth token for {admin_email}")
-                return token
+        if login_response.status_code == 200:
+            token_data = login_response.json()
+            access_token = token_data.get("access_token")
 
-            except Exception as e:
-                logger.error(f"Error generating admin token: {e}")
-                return None
+            if access_token:
+                logger.info("✓ Successfully obtained JWT access token")
+                return access_token
+            else:
+                logger.error("No access_token in login response")
+                raise SeedingError("Failed to get access token from login")
+        else:
+            logger.error(f"Login failed: {login_response.status_code}")
+            logger.error(f"Response: {login_response.text}")
+            raise SeedingError(f"Login failed with status {login_response.status_code}")
 
-        # Run the async function
-        token = asyncio.run(get_admin_token())
-        if token:
-            return token
-
+    except requests.exceptions.ConnectionError:
+        logger.error("Could not connect to application - is it running?")
+        raise SeedingError("Application not accessible")
     except Exception as e:
-        logger.error(f"Error setting up multi-user token generation: {e}")
-
-    # Fallback to placeholder
-    logger.warning("Using placeholder token - authentication may fail")
-    return "test-token-placeholder"
+        logger.error(f"Error during JWT authentication: {e}")
+        raise SeedingError(f"Authentication failed: {e}")
 
 
 def wait_for_application_ready(client: APIClient, max_wait: int = 60) -> bool:

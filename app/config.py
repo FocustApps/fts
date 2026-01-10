@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from typing import List
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -11,11 +11,23 @@ class BaseAppConfig(BaseModel):
     jquery_version: str = "3.7.1"
     bootstrap_version: str = "5.3.7"
 
-    # Authentication settings
-    auth_token_file_path: Path = Path("auth_token.txt")
-    auth_rotation_interval_minutes: int = 30
-    auth_external_sync_enabled: bool = False
-    auth_external_sync_url: str = ""
+    # JWT Authentication settings
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_hours: int = 24
+    jwt_refresh_token_expire_days: int = 7
+    enforce_https: bool = False
+    cors_allow_origins: List[str] = []
+    rate_limit_enabled: bool = True
+    admin_email: str = "admin@fenrir.local"
+    frontend_url: str = "http://localhost:8080"
+
+    # Password Requirements (configurable)
+    password_min_length: int = 8
+    password_require_uppercase: bool = True
+    password_require_lowercase: bool = True
+    password_require_digit: bool = True
+    password_require_special: bool = True
 
     # Email notification settings
     email_notification_enabled: bool = False
@@ -61,21 +73,43 @@ class BaseAppConfig(BaseModel):
 
 def get_base_app_config() -> BaseAppConfig:
     load_dotenv()
+
+    # Parse CORS origins from comma-separated string
+    cors_origins_str = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:8080")
+    cors_origins = [
+        origin.strip() for origin in cors_origins_str.split(",") if origin.strip()
+    ]
+
     return BaseAppConfig(
         environment=os.getenv("ENVIRONMENT", "local"),
         api_version=os.getenv("API_VERSION", "v1"),
         htmx_version=os.getenv("HTMX_VERSION", "2.0.4"),
         jquery_version=os.getenv("JQUERY_VERSION", "3.7.1"),
         bootstrap_version=os.getenv("BOOTSTRAP_VERSION", "5.3.8"),
-        auth_token_file_path=Path(os.getenv("AUTH_TOKEN_FILE_PATH", "auth_token.txt")),
-        auth_rotation_interval_minutes=int(
-            os.getenv("AUTH_ROTATION_INTERVAL_MINUTES", "30")
+        # JWT settings
+        jwt_secret_key=os.getenv("JWT_SECRET_KEY", ""),
+        jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
+        jwt_access_token_expire_hours=int(
+            os.getenv("JWT_ACCESS_TOKEN_EXPIRE_HOURS", "24")
         ),
-        auth_external_sync_enabled=os.getenv(
-            "AUTH_EXTERNAL_SYNC_ENABLED", "false"
-        ).lower()
+        jwt_refresh_token_expire_days=int(
+            os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7")
+        ),
+        enforce_https=os.getenv("ENFORCE_HTTPS", "false").lower() == "true",
+        cors_allow_origins=cors_origins,
+        rate_limit_enabled=os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true",
+        admin_email=os.getenv("ADMIN_EMAIL", "admin@fenrir.local"),
+        frontend_url=os.getenv("FRONTEND_URL", "http://localhost:8080"),
+        # Password requirements
+        password_min_length=int(os.getenv("PASSWORD_MIN_LENGTH", "8")),
+        password_require_uppercase=os.getenv("PASSWORD_REQUIRE_UPPERCASE", "true").lower()
         == "true",
-        auth_external_sync_url=os.getenv("AUTH_EXTERNAL_SYNC_URL", ""),
+        password_require_lowercase=os.getenv("PASSWORD_REQUIRE_LOWERCASE", "true").lower()
+        == "true",
+        password_require_digit=os.getenv("PASSWORD_REQUIRE_DIGIT", "true").lower()
+        == "true",
+        password_require_special=os.getenv("PASSWORD_REQUIRE_SPECIAL", "true").lower()
+        == "true",
         email_notification_enabled=os.getenv(
             "EMAIL_NOTIFICATION_ENABLED", "false"
         ).lower()

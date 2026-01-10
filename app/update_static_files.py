@@ -12,7 +12,7 @@ from typing import List
 import requests
 import zipfile
 
-from app.config import get_base_app_config, BaseAppConfig
+from app.config import get_base_app_config
 from app.utils import get_project_root
 
 BASE_APP_CONFIG = get_base_app_config()
@@ -133,9 +133,10 @@ def update_bootstrap_dependency(bootstrap_version: str):
 
 
 def main():
-    _current_static_file_versions = BaseAppConfig()
-
     deployed_versions = get_base_app_config()
+
+    # Get current static file versions from config
+    _current_static_file_versions = deployed_versions
 
     if _current_static_file_versions.htmx_version != deployed_versions.htmx_version:
         htmx_url = f"https://unpkg.com/htmx.org@{deployed_versions.htmx_version}/dist/htmx.min.js"

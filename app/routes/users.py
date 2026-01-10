@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.config import get_base_app_config
 from common.service_connections.db_service.db_manager import DB_ENGINE
-from app.dependencies.multi_user_auth_dependency import verify_auth_token
+from app.dependencies.jwt_auth_dependency import get_current_user
+from app.models.auth_models import TokenPayload
 
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass
@@ -139,7 +140,9 @@ user_api_router = APIRouter(prefix="/user/api", tags=["user"], include_in_schema
 
 @user_api_router.post("/user")
 def create_user(
-    request: Request, user: UserModel, token: str = Depends(verify_auth_token)
+    request: Request,
+    user: UserModel,
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> UserModel:
     user_id = insert_user(user=user, engine=DB_ENGINE)
     with Session(DB_ENGINE) as db_session:
@@ -153,14 +156,18 @@ def create_user(
 
 
 @user_api_router.get("/all-users")
-def get_all_users(request: Request, token: str = Depends(verify_auth_token)):
+def get_all_users(
+    request: Request, current_user: TokenPayload = Depends(get_current_user)
+):
     with Session(DB_ENGINE) as db_session:
         return query_all_users(session=db_session, engine=DB_ENGINE)
 
 
 @user_api_router.get("/user/{record_id}")
 def get_user_by_id(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     with Session(DB_ENGINE) as db_session:
         return query_user_by_id(user_id=record_id, session=db_session, engine=DB_ENGINE)
@@ -171,13 +178,15 @@ def update_user(
     request: Request,
     record_id: int,
     user: UserModel,
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     return update_user_by_id(user_id=record_id, user=user, engine=DB_ENGINE)
 
 
 @user_api_router.delete("/user/{record_id}")
 def delete_user_by_id(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     return drop_user_by_id(user_id=record_id, engine=DB_ENGINE)

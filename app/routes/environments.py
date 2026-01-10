@@ -10,7 +10,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.db_manager import DB_ENGINE
-from app.dependencies.multi_user_auth_dependency import verify_auth_token
+from app.dependencies.jwt_auth_dependency import get_current_user
+from app.models.auth_models import TokenPayload
 
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass
@@ -36,7 +37,7 @@ environments_templates = Jinja2Templates(directory=TEMPLATE_PATH)
 
 
 @env_views_router.get("/")
-async def get_environments(request: Request, token: str = Depends(verify_auth_token)):
+async def get_environments(request: Request, current_user: TokenPayload = Depends(get_current_user)):
     with Session(DB_ENGINE) as db_session:
         environments = query_all_environments(session=db_session, engine=DB_ENGINE)
     for env in environments:
@@ -76,7 +77,7 @@ async def get_environments(request: Request, token: str = Depends(verify_auth_to
 
 
 @env_views_router.get("/new-environment")
-async def new_environment(request: Request, token: str = Depends(verify_auth_token)):
+async def new_environment(request: Request, current_user: TokenPayload = Depends(get_current_user)):
     return environments_templates.TemplateResponse(
         "/environments/env_new.html",
         {
@@ -89,7 +90,7 @@ async def new_environment(request: Request, token: str = Depends(verify_auth_tok
 
 @env_views_router.get("/{record_id}")
 async def view_environment(
-    request: Request, record_id: str, token: str = Depends(verify_auth_token)
+    request: Request, record_id: str, current_user: TokenPayload = Depends(get_current_user)
 ):
     with Session(DB_ENGINE) as db_session:
         environment = query_environment_by_id(
@@ -134,7 +135,7 @@ async def view_updated_environment(
 
 @env_views_router.get("/{record_id}/edit")
 def view_edit_environment(
-    request: Request, record_id: str, token: str = Depends(verify_auth_token)
+    request: Request, record_id: str, current_user: TokenPayload = Depends(get_current_user)
 ):
     with Session(DB_ENGINE) as db_session:
         environment = query_environment_by_id(
@@ -160,7 +161,7 @@ env_api_router = APIRouter(prefix="/env/api", tags=["env"], include_in_schema=Tr
 async def create_environment(
     request: Request,
     environment: EnvironmentModel,
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> EnvironmentModel:
     env_id = insert_environment(environment=environment, engine=DB_ENGINE)
     with Session(DB_ENGINE) as db_session:
@@ -171,7 +172,7 @@ async def create_environment(
 
 @env_api_router.get("/")
 async def view_all_environments(
-    request: Request, token: str = Depends(verify_auth_token)
+    request: Request, current_user: TokenPayload = Depends(get_current_user)
 ):
     with Session(DB_ENGINE) as db_session:
         return query_all_environments(session=db_session, engine=DB_ENGINE)
@@ -179,7 +180,7 @@ async def view_all_environments(
 
 @env_api_router.get("/{environment_id}")
 async def get_environment(
-    request: Request, environment_id: str, token: str = Depends(verify_auth_token)
+    request: Request, environment_id: str, current_user: TokenPayload = Depends(get_current_user)
 ):
     with Session(DB_ENGINE) as db_session:
         return query_environment_by_id(
@@ -192,7 +193,7 @@ async def update_environment(
     request: Request,
     environment_id: str,
     environment: EnvironmentModel,
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ) -> EnvironmentModel:
     update_environment_by_id(
         environment_id=environment_id,
@@ -207,6 +208,6 @@ async def update_environment(
 
 @env_api_router.delete("/{environment_id}")
 async def delete_environment(
-    request: Request, environment_id: str, token: str = Depends(verify_auth_token)
+    request: Request, environment_id: str, current_user: TokenPayload = Depends(get_current_user)
 ):
     return deactivate_environment_by_id(environment_id=environment_id, engine=DB_ENGINE)

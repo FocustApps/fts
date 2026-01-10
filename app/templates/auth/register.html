@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Fenrir Test Automation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/styles.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 0;
+        }
+
+        .auth-card {
+            max-width: 450px;
+            width: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+        }
+
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .auth-logo h1 {
+            color: #667eea;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .password-requirements {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .password-requirements ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .requirement-met {
+            color: #198754;
+        }
+
+        .requirement-unmet {
+            color: #dc3545;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="auth-card">
+        <div class="auth-logo">
+            <h1>🛡️ Fenrir</h1>
+            <p class="text-muted">Create Your Account</p>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <form id="register-form">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" required>
+                <div class="password-requirements mt-2">
+                    <small>Password must contain:</small>
+                    <ul id="requirements-list">
+                        <li id="req-length" class="requirement-unmet">At least 8 characters</li>
+                        <li id="req-uppercase" class="requirement-unmet">One uppercase letter</li>
+                        <li id="req-lowercase" class="requirement-unmet">One lowercase letter</li>
+                        <li id="req-digit" class="requirement-unmet">One number</li>
+                        <li id="req-special" class="requirement-unmet">One special character</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="confirm-password" class="form-label">Confirm Password</label>
+                <input type="password" class="form-control" id="confirm-password" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mb-3">
+                <span id="register-text">Create Account</span>
+                <span id="register-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+            </button>
+
+            <div class="text-center">
+                <p class="text-muted small mb-0">Already have an account? <a href="/auth/login">Login</a></p>
+            </div>
+        </form>
+    </div>
+
+    <script src="/public/js/auth.js"></script>
+    <script>
+        const form = document.getElementById('register-form');
+        const passwordInput = document.getElementById('password');
+        const alertContainer = document.getElementById('alert-container');
+        const registerText = document.getElementById('register-text');
+        const registerSpinner = document.getElementById('register-spinner');
+
+        function showAlert(message, type = 'danger') {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+
+        // Real-time password validation
+        passwordInput.addEventListener('input', () => {
+            const password = passwordInput.value;
+
+            // Check length
+            const reqLength = document.getElementById('req-length');
+            if (password.length >= 8) {
+                reqLength.classList.remove('requirement-unmet');
+                reqLength.classList.add('requirement-met');
+            } else {
+                reqLength.classList.remove('requirement-met');
+                reqLength.classList.add('requirement-unmet');
+            }
+
+            // Check uppercase
+            const reqUppercase = document.getElementById('req-uppercase');
+            if (/[A-Z]/.test(password)) {
+                reqUppercase.classList.remove('requirement-unmet');
+                reqUppercase.classList.add('requirement-met');
+            } else {
+                reqUppercase.classList.remove('requirement-met');
+                reqUppercase.classList.add('requirement-unmet');
+            }
+
+            // Check lowercase
+            const reqLowercase = document.getElementById('req-lowercase');
+            if (/[a-z]/.test(password)) {
+                reqLowercase.classList.remove('requirement-unmet');
+                reqLowercase.classList.add('requirement-met');
+            } else {
+                reqLowercase.classList.remove('requirement-met');
+                reqLowercase.classList.add('requirement-unmet');
+            }
+
+            // Check digit
+            const reqDigit = document.getElementById('req-digit');
+            if (/\d/.test(password)) {
+                reqDigit.classList.remove('requirement-unmet');
+                reqDigit.classList.add('requirement-met');
+            } else {
+                reqDigit.classList.remove('requirement-met');
+                reqDigit.classList.add('requirement-unmet');
+            }
+
+            // Check special character
+            const reqSpecial = document.getElementById('req-special');
+            if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+                reqSpecial.classList.remove('requirement-unmet');
+                reqSpecial.classList.add('requirement-met');
+            } else {
+                reqSpecial.classList.remove('requirement-met');
+                reqSpecial.classList.add('requirement-unmet');
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                showAlert('Passwords do not match');
+                return;
+            }
+
+            // Show loading state
+            registerText.classList.add('d-none');
+            registerSpinner.classList.remove('d-none');
+            form.querySelectorAll('input, button').forEach(el => el.disabled = true);
+
+            try {
+                await window.authClient.register(email, password, username);
+                showAlert('Registration successful! Redirecting to login...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/auth/login';
+                }, 1500);
+            } catch (error) {
+                showAlert(error.message);
+                // Reset loading state
+                registerText.classList.remove('d-none');
+                registerSpinner.classList.add('d-none');
+                form.querySelectorAll('input, button').forEach(el => el.disabled = false);
+            }
+        });
+
+        // Check if already logged in
+        if (window.authClient.isAuthenticated()) {
+            window.location.href = '/';
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

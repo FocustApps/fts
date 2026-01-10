@@ -5,7 +5,8 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.db_manager import DB_ENGINE
-from app.dependencies.multi_user_auth_dependency import verify_auth_token
+from app.dependencies.jwt_auth_dependency import get_current_user
+from app.models.auth_models import TokenPayload
 
 from app import TEMPLATE_PATH
 from app.routes.template_dataclasses import ViewRecordDataclass
@@ -30,7 +31,7 @@ email_processor_templates = Jinja2Templates(directory=TEMPLATE_PATH)
 
 @email_processor_views_router.get("/", response_class=HTMLResponse)
 async def get_email_processing_items(
-    request: Request, token: str = Depends(verify_auth_token)
+    request: Request, current_user: TokenPayload = Depends(get_current_user)
 ):
     with Session(DB_ENGINE) as db_session:
         email_items = query_all_email_items(session=db_session, engine=DB_ENGINE)
@@ -73,7 +74,9 @@ async def get_email_processing_items(
 
 @email_processor_views_router.get("/email-item/{record_id}", response_class=HTMLResponse)
 async def view_email_item(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
 
     with Session(DB_ENGINE) as db_session:
@@ -92,7 +95,9 @@ async def view_email_item(
 
 
 @email_processor_views_router.get("/new-email-item", response_class=HTMLResponse)
-async def new_email_item(request: Request, token: str = Depends(verify_auth_token)):
+async def new_email_item(
+    request: Request, current_user: TokenPayload = Depends(get_current_user)
+):
     return email_processor_templates.TemplateResponse(
         "email_processor/email_processor_new.html",
         {
@@ -107,7 +112,7 @@ async def new_email_item(request: Request, token: str = Depends(verify_auth_toke
 async def create_email_item(
     request: Request,
     email_item: EmailProcessorModel,
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     from common.service_connections.test_case_service.azure_devops_test_cases import (
         get_work_item_by_id,
@@ -166,7 +171,9 @@ async def update_email_item(
     "/email-item/{record_id}/edit", response_class=HTMLResponse
 )
 async def view_edit_email_item(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     with Session(DB_ENGINE) as db_session:
         email_item = query_email_item_by_id(
@@ -186,7 +193,9 @@ async def view_edit_email_item(
 
 @email_processor_views_router.delete("/{record_id}")
 async def delete_email_item(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
 
     email_item = drop_email_item_by_id(email_item_id=record_id, engine=DB_ENGINE)

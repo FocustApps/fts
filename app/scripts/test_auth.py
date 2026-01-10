@@ -1,39 +1,51 @@
 #!/usr/bin/env python3
 """
-Simple script to test authentication with the current token.
+Simple script to test JWT authentication with the current token.
 """
 import requests
 import sys
 
 
 def get_token_from_file():
-    """Get token from the auth token file."""
-    token_file = "/tmp/fenrir_auth_token.txt"
-    try:
-        with open(token_file, "r") as f:
-            content = f.read().strip()
-            for line in content.split("\n"):
-                if line.startswith("token="):
-                    return line.split("token=", 1)[1].strip()
-    except Exception as e:
-        print(f"Error reading token file: {e}")
+    """Get JWT token from the auth token file."""
+    # Try new JWT token file first
+    token_files = [
+        "/tmp/fenrir_jwt_token.txt",
+        "/tmp/fenrir_auth_token.txt",  # Legacy fallback
+    ]
+
+    for token_file in token_files:
+        try:
+            with open(token_file, "r") as f:
+                content = f.read().strip()
+                for line in content.split("\n"):
+                    if line.startswith("token="):
+                        token = line.split("token=", 1)[1].strip()
+                        print(f"📁 Found token in: {token_file}")
+                        return token
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            print(f"Error reading {token_file}: {e}")
+
     return None
 
 
 def test_auth():
-    """Test authentication with current token."""
-    print("🔍 Testing authentication...")
+    """Test JWT authentication with current token."""
+    print("🔍 Testing JWT authentication...")
 
     # Get token
     token = get_token_from_file()
     if not token:
         print("❌ Could not get token from file")
+        print("💡 Run 'python app/scripts/get_jwt_token.py' first")
         return False
 
-    print(f"🔑 Using token: {token[:8]}...{token[-8:]}")
+    print(f"🔑 Using JWT token: {token[:20]}...{token[-20:]}")
 
-    # Test authentication
-    headers = {"X-Auth-Token": token}
+    # Test authentication with JWT Bearer token
+    headers = {"Authorization": f"Bearer {token}"}
 
     try:
         response = requests.get(

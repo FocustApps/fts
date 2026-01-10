@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import Engine
 
 from common.service_connections.db_service.database import AuthUserTable
@@ -9,7 +9,7 @@ from common.service_connections.db_service.database import AuthUserTable
 
 class AuthUserModel(BaseModel):
     """
-    Schema for representing an authenticated user.
+    Schema for representing an authenticated user with JWT authentication.
 
     Fields match AuthUserTable database schema.
     """
@@ -19,8 +19,10 @@ class AuthUserModel(BaseModel):
     username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
-    current_token: str | None = None
-    token_expires_at: datetime | None = None
+    password: str | None = Field(None, exclude=True)  # Write-only field for registration
+    password_hash: str | None = None  # Bcrypt hash, only populated when reading from DB
+    password_reset_token: str | None = None
+    password_reset_expires: datetime | None = None
     is_active: bool = True
     is_admin: bool = False
     is_super_admin: bool = False
@@ -49,11 +51,35 @@ def insert_auth_user(auth_user: AuthUserModel, session, engine: Engine) -> AuthU
         logging.warning("AuthUser ID will only be set by the system")
     with session(engine) as db_session:
         auth_user.created_at = datetime.now()
-        db_auth_user = AuthUserTable(**auth_user.model_dump())
+        # Exclude None values to trigger database defaults
+        user_data = auth_user.model_dump(exclude_none=True)
+        # Remove auth_user_id if it's None to let database generate it
+        user_data.pop("auth_user_id", None)
+        db_auth_user = AuthUserTable(**user_data)
         db_session.add(db_auth_user)
         db_session.commit()
-        db_session.refresh(db_auth_user)
-    return auth_user
+        # ID is available after commit, no need for refresh
+        # Create return model INSIDE session context while object is still attached
+        result = AuthUserModel(
+            auth_user_id=db_auth_user.auth_user_id,
+            email=db_auth_user.email,
+            username=db_auth_user.username,
+            first_name=db_auth_user.first_name,
+            last_name=db_auth_user.last_name,
+            password_hash=db_auth_user.password_hash,
+            password_reset_token=db_auth_user.password_reset_token,
+            password_reset_expires=db_auth_user.password_reset_expires,
+            is_active=db_auth_user.is_active,
+            is_admin=db_auth_user.is_admin,
+            is_super_admin=db_auth_user.is_super_admin,
+            multi_account_user=db_auth_user.multi_account_user,
+            account_ids=db_auth_user.account_ids,
+            user_subscription_id=db_auth_user.user_subscription_id,
+            created_at=db_auth_user.created_at,
+            last_login_at=db_auth_user.last_login_at,
+            updated_at=db_auth_user.updated_at,
+        )
+    return result
 
 
 def query_auth_user_by_username(username: str, session, engine: Engine) -> AuthUserModel:
@@ -126,10 +152,8 @@ def deactivate_auth_user(user_id: int, session, engine: Engine) -> AuthUserModel
         if not db_auth_user:
             raise ValueError(f"AuthUser with ID {user_id} not found.")
 
-        # Deactivate user and clear token data
+        # Deactivate user (tokens will be revoked separately via auth_tokens table)
         db_auth_user.is_active = False
-        db_auth_user.current_token = None
-        db_auth_user.token_expires_at = None
         db_auth_user.updated_at = datetime.now(timezone.utc)
 
         db_session.commit()

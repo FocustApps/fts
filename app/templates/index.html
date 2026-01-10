@@ -8,7 +8,17 @@
     <script src="public/js/bootstrap.bundle.min.js"></script>
     <script src="public/js/htmx.min.js"></script>
     <script src="public/js/json-enc.js"></script>
+    <script src="public/js/auth.js"></script>
     <title> FTS </title>
+    <script>
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!window.authClient || !window.authClient.isAuthenticated()) {
+                // No valid token, redirect to login
+                window.location.href = '/auth/login';
+            }
+        });
+    </script>
 </head>
 
 <body id="body">
@@ -24,7 +34,7 @@
                 <ul class="navbar-nav">
                     {% for key, value in navigation.items() %}
                     <li class="nav-item">
-                        <button id={{ value|e }} class="nav-link btn btn-success" hx-get={{ url_for(value|e) }}
+                        <button id="{{ key|e }}" class="nav-link btn btn-success" hx-get="{{ value }}"
                             hx-trigger="click" hx-target="#pageContent" hx-swap="innerHTML" type="button">
                             {{ key|e }}
                         </button>

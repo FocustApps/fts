@@ -10,7 +10,8 @@ from common.service_connections.db_service.db_manager import DB_ENGINE
 from common.service_connections.db_service.database.engine import (
     get_database_session as Session,
 )
-from app.dependencies.multi_user_auth_dependency import verify_auth_token
+from app.dependencies.jwt_auth_dependency import get_current_user
+from app.models.auth_models import TokenPayload
 
 from common.service_connections.db_service.models.action_chain_model import (
     ActionChainModel,
@@ -33,7 +34,9 @@ actions_templates = Jinja2Templates(TEMPLATE_PATH)
 
 
 @actions_views_router.get("/", name="get_actions_view")
-async def get_actions_view(request: Request, token: str = Depends(verify_auth_token)):
+async def get_actions_view(
+    request: Request, current_user: TokenPayload = Depends(get_current_user)
+):
     """Get all action chains for display in table view."""
     # Get all action chains with their data
     with Session(DB_ENGINE) as db_session:
@@ -71,7 +74,9 @@ async def get_actions_view(request: Request, token: str = Depends(verify_auth_to
 
 
 @actions_views_router.get("/new", name="new_action_chain")
-async def new_action_chain(request: Request, token: str = Depends(verify_auth_token)):
+async def new_action_chain(
+    request: Request, current_user: TokenPayload = Depends(get_current_user)
+):
     """Display form for creating a new action chain."""
     return actions_templates.TemplateResponse(
         "/actions/actions_new.html",
@@ -81,7 +86,9 @@ async def new_action_chain(request: Request, token: str = Depends(verify_auth_to
 
 @actions_views_router.get("/{record_id}", name="view_action_chain")
 async def view_action_chain(
-    request: Request, record_id: str, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: str,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """View details of a specific action chain."""
     with Session(DB_ENGINE) as db_session:
@@ -128,7 +135,9 @@ async def view_action_chain(
 
 @actions_views_router.get("/{record_id}/edit", name="edit_action_chain")
 async def edit_action_chain(
-    request: Request, record_id: str, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: str,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Display form for editing an action chain."""
     with Session(DB_ENGINE) as db_session:
@@ -148,7 +157,9 @@ async def edit_action_chain(
 
 @actions_views_router.delete("/{record_id}", name="delete_action_chain")
 async def delete_action_chain(
-    request: Request, record_id: str, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: str,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Delete an action chain."""
     with Session(DB_ENGINE) as db_session:
@@ -164,7 +175,9 @@ async def delete_action_chain(
 
 
 @actions_api_router.get("/", response_model=List[ActionChainModel])
-async def get_all_action_chains_api(token: str = Depends(verify_auth_token)):
+async def get_all_action_chains_api(
+    current_user: TokenPayload = Depends(get_current_user),
+):
     """API endpoint to get all action chains."""
     with Session(DB_ENGINE) as db_session:
         return query_all_action_chains(db_session=db_session, engine=DB_ENGINE)
@@ -172,7 +185,7 @@ async def get_all_action_chains_api(token: str = Depends(verify_auth_token)):
 
 @actions_api_router.get("/{action_chain_id}", response_model=ActionChainModel)
 async def get_action_chain_by_id_api(
-    action_chain_id: str, token: str = Depends(verify_auth_token)
+    action_chain_id: str, current_user: TokenPayload = Depends(get_current_user)
 ):
     """API endpoint to get a specific action chain by ID."""
     with Session(DB_ENGINE) as db_session:
@@ -183,7 +196,7 @@ async def get_action_chain_by_id_api(
 
 @actions_api_router.post("/", response_model=ActionChainModel)
 async def create_action_chain_api(
-    action_chain: ActionChainModel, token: str = Depends(verify_auth_token)
+    action_chain: ActionChainModel, current_user: TokenPayload = Depends(get_current_user)
 ):
     """API endpoint to create a new action chain."""
     with Session(DB_ENGINE) as db_session:
@@ -196,7 +209,7 @@ async def create_action_chain_api(
 async def update_action_chain_api(
     action_chain_id: str,
     action_chain: ActionChainModel,
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """API endpoint to update an action chain."""
     with Session(DB_ENGINE) as db_session:
@@ -210,7 +223,7 @@ async def update_action_chain_api(
 
 @actions_api_router.delete("/{action_chain_id}")
 async def delete_action_chain_api(
-    action_chain_id: str, token: str = Depends(verify_auth_token)
+    action_chain_id: str, current_user: TokenPayload = Depends(get_current_user)
 ):
     """API endpoint to delete an action chain."""
     with Session(DB_ENGINE) as db_session:

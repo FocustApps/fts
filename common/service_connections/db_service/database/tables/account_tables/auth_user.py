@@ -24,15 +24,15 @@ if TYPE_CHECKING:
 
 
 class AuthUserTable(Base):
-    """Authentication users table for system access control.
+    """Authentication users table for JWT-based access control.
 
     Business Logic Documentation:
 
     1. Define at a high level what this table is suppose to represent in terms of a goal
        or goals that need to be accomplished by a user?
        - Manages authentication and authorization for users accessing the Fenrir platform.
-         Handles token-based authentication, role-based access control (admin, super_admin),
-         and multi-account user support.
+         Handles JWT-based authentication with bcrypt password hashing, role-based access
+         control (admin, super_admin), and multi-account user support.
 
     2. What level of user should be interacting with this table?
        - Super Admin: Full CRUD access
@@ -50,8 +50,8 @@ class AuthUserTable(Base):
          is deleted, but record preserved for audit trails.
 
     5. Will this table be require a connection a secure cloud provider service?
-       - No direct cloud connection, but authentication tokens may integrate with
-         external OAuth providers or SSO services in the future.
+       - No direct cloud connection, but authentication may integrate with external
+         OAuth providers or SSO services in the future.
     """
 
     __tablename__ = "auth_users"
@@ -63,8 +63,11 @@ class AuthUserTable(Base):
     username: Mapped[Optional[str]] = mapped_column(sql.String(96))
     first_name: Mapped[Optional[str]] = mapped_column(sql.String(255))
     last_name: Mapped[Optional[str]] = mapped_column(sql.String(255))
-    current_token: Mapped[Optional[str]] = mapped_column(sql.String(64))
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
+    password_hash: Mapped[str] = mapped_column(sql.String(255), nullable=False)
+    password_reset_token: Mapped[Optional[str]] = mapped_column(
+        sql.String(64), unique=True, nullable=True
+    )
+    password_reset_expires: Mapped[Optional[datetime]] = mapped_column(sql.DateTime)
     is_active: Mapped[bool] = mapped_column(sql.Boolean, default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(sql.Boolean, default=False, nullable=False)
     is_super_admin: Mapped[bool] = mapped_column(
@@ -99,12 +102,6 @@ class AuthUserTable(Base):
 
     def __repr__(self) -> str:
         return f"<AuthUser(auth_user_id={self.auth_user_id}, email='{self.email}', is_active={self.is_active})>"
-
-    def is_token_valid(self) -> bool:
-        """Check if the current token is valid and not expired."""
-        if not self.current_token or not self.token_expires_at:
-            return False
-        return datetime.now(timezone.utc) < self.token_expires_at
 
     def update_last_login(self) -> None:
         """Update the last login timestamp to now."""

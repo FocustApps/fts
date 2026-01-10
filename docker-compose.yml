@@ -49,6 +49,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Database Configuration
       DB_HOST: postgres
       DB_PORT: 5432
       POSTGRES_DB: fenrir
@@ -57,19 +58,93 @@ services:
       POSTGRES_NAME: fenrir_local
       DATABASE_TYPE: postgres
       PYTHONPATH: /fenrir
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      AUTH_EXTERNAL_SYNC_ENABLED: false # Disable main AuthService external sync
+
+      # Application Configuration
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      API_VERSION: ${API_VERSION:-v1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # JWT Authentication Settings (REQUIRED)
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-ec0ffc680d8c48871658bf8dfdf57644a4db148fe61336ab92e4b8710ca8bc81}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_HOURS: ${JWT_ACCESS_TOKEN_EXPIRE_HOURS:-24}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      ENFORCE_HTTPS: ${ENFORCE_HTTPS:-false}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fenrir.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+
+      # Password Requirements
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-8}
+      PASSWORD_REQUIRE_UPPERCASE: ${PASSWORD_REQUIRE_UPPERCASE:-true}
+      PASSWORD_REQUIRE_LOWERCASE: ${PASSWORD_REQUIRE_LOWERCASE:-true}
+      PASSWORD_REQUIRE_DIGIT: ${PASSWORD_REQUIRE_DIGIT:-true}
+      PASSWORD_REQUIRE_SPECIAL: ${PASSWORD_REQUIRE_SPECIAL:-true}
+
+      # Email Notification Settings
       EMAIL_NOTIFICATION_ENABLED: ${EMAIL_NOTIFICATION_ENABLED:-false}
-      # MailHog SMTP settings for local development
       SMTP_SERVER: ${SMTP_SERVER:-mailhog}
       SMTP_PORT: ${SMTP_PORT:-1025}
       EMAIL_USER: ${EMAIL_USER:-fenrir@local.test}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:-password}
       EMAIL_RECIPIENT: ${EMAIL_RECIPIENT:-admin@local.test}
       USE_MAILHOG: ${USE_MAILHOG:-true}
+
+      # Storage Settings
+      STORAGE_ENABLED: ${STORAGE_ENABLED:-false}
+      STORAGE_PROVIDER_TYPE: ${STORAGE_PROVIDER_TYPE:-local}
+      STORAGE_LOCAL_BASE_DIRECTORY: ${STORAGE_LOCAL_BASE_DIRECTORY:-./data/tokens}
+
+      # Static Asset Versions
+      HTMX_VERSION: ${HTMX_VERSION:-2.0.6}
+      JQUERY_VERSION: ${JQUERY_VERSION:-3.7.1}
+      BOOTSTRAP_VERSION: ${BOOTSTRAP_VERSION:-5.3.8}
+
+      # Legacy Auth (Disabled)
+      AUTH_EXTERNAL_SYNC_ENABLED: false
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  seeder:
+    build:
+      context: .
+      dockerfile: app/scripts/Dockerfile
+    environment:
+      # Database Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POSTGRES_DB: fenrir
+      POSTGRES_USER: fenrir
+      POSTGRES_PASSWORD: fenrirpass
+      DATABASE_TYPE: postgres
+      PYTHONPATH: /fenrir
+
+      # Application Configuration
+      ENVIRONMENT: local
+
+      # JWT Authentication Settings
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-ec0ffc680d8c48871658bf8dfdf57644a4db148fe61336ab92e4b8710ca8bc81}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fenrir.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+
+      # Seeding Configuration
+      BASE_URL: http://fenrir:8080
+    depends_on:
+      fenrir:
+        condition: service_healthy
+    profiles:
+      - local
+    command: ["python", "app/scripts/seed_local_environment.py"]
+    restart: "no"
 
   tests:
     build:

@@ -34,6 +34,9 @@ from common.service_connections.db_service.database.tables.account_tables.accoun
 from common.service_connections.db_service.database.tables.account_tables.auth_token import (
     AuthTokenTable,
 )
+from common.service_connections.db_service.database.tables.account_tables.revoked_token import (
+    RevokedTokenTable,
+)
 from common.service_connections.db_service.database.tables.audit_log import AuditLogTable
 from common.service_connections.db_service.database.tables.system_under_test import (
     SystemUnderTestTable,
@@ -81,6 +84,7 @@ __all__ = [
     # New core tables
     "AccountTable",
     "AuthTokenTable",
+    "RevokedTokenTable",
     "AuditLogTable",
     "SystemUnderTestTable",
     "PlanTable",

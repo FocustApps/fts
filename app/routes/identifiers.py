@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from common.service_connections.db_service.db_manager import DB_ENGINE
-from app.dependencies.multi_user_auth_dependency import verify_auth_token
+from app.dependencies.jwt_auth_dependency import get_current_user
+from app.models.auth_models import TokenPayload
 from common.service_connections.db_service.models.user_interface_models.identifier_model import (
     IdentifierModel,
     query_all_identifiers,
@@ -47,7 +48,9 @@ templates = Jinja2Templates(directory=TEMPLATE_PATH)
 @identifiers_views_router.get(
     "/", response_class=HTMLResponse, name="get_identifiers_view"
 )
-async def get_identifiers_view(request: Request, token: str = Depends(verify_auth_token)):
+async def get_identifiers_view(
+    request: Request, current_user: TokenPayload = Depends(get_current_user)
+):
     """Display the identifiers management page."""
     try:
         with Session(DB_ENGINE) as db_session:
@@ -89,7 +92,9 @@ async def get_identifiers_view(request: Request, token: str = Depends(verify_aut
     "/{record_id}", response_class=HTMLResponse, name="view_identifier"
 )
 async def view_identifier(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Display details for a specific identifier."""
     try:
@@ -137,7 +142,7 @@ async def view_identifier(
 async def new_identifier_view(
     request: Request,
     page_id: Optional[int] = None,
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Display form for adding a new identifier."""
     page = None
@@ -181,7 +186,7 @@ async def create_identifier_view(
     locator_query: str = Form(...),
     action: str = Form(""),
     environments: List[str] = Form([]),
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Handle form submission for creating a new identifier."""
     try:
@@ -236,7 +241,9 @@ async def create_identifier_view(
     "/{record_id}/edit", response_class=HTMLResponse, name="edit_identifier"
 )
 async def edit_identifier_view(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Display form for editing an identifier."""
     try:
@@ -273,7 +280,7 @@ async def update_identifier_view(
     locator_query: str = Form(...),
     action: str = Form(""),
     environments: List[str] = Form([]),
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Handle form submission for updating an identifier."""
     try:
@@ -332,7 +339,9 @@ async def update_identifier_view(
     "/{record_id}/delete", response_class=HTMLResponse, name="delete_identifier_view"
 )
 async def delete_identifier_view(
-    request: Request, record_id: int, token: str = Depends(verify_auth_token)
+    request: Request,
+    record_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Delete an identifier (HTMX endpoint)."""
     try:
@@ -373,7 +382,7 @@ async def delete_identifier_view(
 
 
 @identifiers_api_router.get("/", response_model=List[dict])
-async def list_identifiers_api(token: str = Depends(verify_auth_token)):
+async def list_identifiers_api(current_user: TokenPayload = Depends(get_current_user)):
     """List all identifiers."""
     try:
         with Session(DB_ENGINE) as db_session:
@@ -387,7 +396,9 @@ async def list_identifiers_api(token: str = Depends(verify_auth_token)):
 @identifiers_api_router.get(
     "/{record_id}", response_model=dict, name="get_identifier_api"
 )
-async def get_identifier_api(record_id: int, token: str = Depends(verify_auth_token)):
+async def get_identifier_api(
+    record_id: int, current_user: TokenPayload = Depends(get_current_user)
+):
     """Get a specific identifier by ID."""
     try:
         with Session(DB_ENGINE) as db_session:
@@ -404,7 +415,7 @@ async def get_identifier_api(record_id: int, token: str = Depends(verify_auth_to
 
 @identifiers_api_router.post("/", response_model=dict)
 async def create_identifier_api(
-    identifier: IdentifierModel, token: str = Depends(verify_auth_token)
+    identifier: IdentifierModel, current_user: TokenPayload = Depends(get_current_user)
 ):
     """Create a new identifier."""
     try:
@@ -439,7 +450,7 @@ async def create_identifier_api(
 async def update_identifier_api(
     record_id: int,
     identifier_update: IdentifierModel,
-    token: str = Depends(verify_auth_token),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """Update an identifier."""
     try:
@@ -467,7 +478,9 @@ async def update_identifier_api(
 
 
 @identifiers_api_router.delete("/{record_id}", name="delete_identifier_api")
-async def delete_identifier_api(record_id: int, token: str = Depends(verify_auth_token)):
+async def delete_identifier_api(
+    record_id: int, current_user: TokenPayload = Depends(get_current_user)
+):
     """Delete an identifier."""
     try:
         with Session(DB_ENGINE) as db_session:
