@@ -162,3 +162,12 @@ IF DOCKER-COMPOSE: Postgres
 The fenrir database blocks IP addresses so if you see a connection error then you will need to add your IP to access it in Azure.
 
 For app-layer contribution guidelines and AI agent rules, see `.github/app-instructions.md`.
+
+### useful commands
+
+```bash
+#Restart only the fenrir app container after code changes
+
+docker compose cp app/. fenrir:/fenrir/app/ && docker compose restart fenrir
+
+```

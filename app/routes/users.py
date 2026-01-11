@@ -3,10 +3,8 @@ The users module contains the API and views for users that have
 access to environments.
 """
 
-from typing import List
 from fastapi import Request, APIRouter, Depends
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+
 from sqlalchemy.orm import Session
 
 from app.config import get_base_app_config
@@ -14,12 +12,8 @@ from common.service_connections.db_service.db_manager import DB_ENGINE
 from app.dependencies.jwt_auth_dependency import get_current_user
 from app.models.auth_models import TokenPayload
 
-from app import TEMPLATE_PATH
-from app.routes.template_dataclasses import ViewRecordDataclass
-from common.fenrir_enums import CloudProviderEnum
 from common.service_connections.db_service.models.environment_model import (
     EnvironmentModel,
-    query_all_environments,
     update_environment_by_id,
 )
 from common.service_connections.db_service.models.account_models.user_model import (
@@ -35,102 +29,6 @@ from common.service_connections.db_service.models.account_models.user_model impo
 API_VERSION = get_base_app_config().api_version or "v1"
 
 user_views_router = APIRouter(prefix="/user", tags=["frontend"], include_in_schema=False)
-
-user_templates = Jinja2Templates(directory=TEMPLATE_PATH)
-
-
-@user_views_router.get("/", response_class=HTMLResponse)
-async def get_users(request: Request):
-    with Session(DB_ENGINE) as db_session:
-        users: List[UserModel] = query_all_users(session=db_session, engine=DB_ENGINE)
-    for user in users:
-        del user.created_at
-        del user.updated_at
-        del user.password
-        del user.secret_provider
-
-    # Handle empty users list
-    if users:
-        headers = [key.replace("_", " ").title() for key in users[0].model_dump().keys()]
-    else:
-        # Default headers when no users exist
-        headers = [
-            "Sut User Id",
-            "Username",
-            "Email",
-            "Secret Url",
-            "Secret Name",
-            "Environment Id",
-        ]
-
-    return user_templates.TemplateResponse(
-        "table.html",
-        {
-            "title": "Users",
-            "request": request,
-            "headers": headers,
-            "table_rows": users,
-            "view_url": "get_users",
-            "view_record_url": "view_user",
-            "add_url": "new_user_view",
-            "delete_url": "delete_user_by_id",
-        },
-    )
-
-
-@user_views_router.get("/{record_id}", response_class=HTMLResponse)
-async def view_user(request: Request, record_id: int):
-    with Session(DB_ENGINE) as db_session:
-        user = query_user_by_id(user_id=record_id, session=db_session, engine=DB_ENGINE)
-    user.password = len(user.password) * "*"
-    return user_templates.TemplateResponse(
-        "view_record.html",
-        ViewRecordDataclass(
-            request=request,
-            record=user.model_dump(),
-            view_url="get_users",
-            edit_url="edit_user",
-        ).model_dump(),
-    )
-
-
-@user_views_router.get("/new/", response_class=HTMLResponse)
-async def new_user_view(request: Request):
-    with Session(DB_ENGINE) as db_session:
-        environments = query_all_environments(session=db_session, engine=DB_ENGINE)
-    return user_templates.TemplateResponse(
-        "users/user_new.html",
-        {
-            "request": request,
-            "environments": environments,
-            "view_url": "get_users",
-            "secret_providers": CloudProviderEnum.get_valid_providers(),
-        },
-    )
-
-
-@user_views_router.patch("/{record_id}", response_class=HTMLResponse)
-async def update_user(request: Request, record_id: int, user: UserModel) -> UserModel:
-    updated_user = update_user_by_id(user_id=record_id, user=user, engine=DB_ENGINE)
-    updated_user.password = len(updated_user.password) * "*"
-    return user_templates.TemplateResponse(
-        "view_record.html", {"request": request, "user": updated_user.model_dump()}
-    )
-
-
-@user_views_router.get("/{record_id}/edit", response_class=HTMLResponse)
-async def edit_user(request: Request, record_id: int):
-    with Session(DB_ENGINE) as db_session:
-        user = query_user_by_id(user_id=record_id, session=db_session, engine=DB_ENGINE)
-    user.password = len(user.password) * "*"
-    return user_templates.TemplateResponse(
-        "users/user_edit.html",
-        {
-            "request": request,
-            "user": user.model_dump(),
-            "secret_providers": CloudProviderEnum.get_valid_providers(),
-        },
-    )
 
 
 ################ API ROUTES ################

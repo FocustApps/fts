@@ -27,7 +27,7 @@ python app/scripts/get_jwt_token.py
 
 **Example Output:**
 
-```
+```text
 🔑 JWT Token Generator
 ========================================
 📧 Admin email: admin@example.com
@@ -61,7 +61,7 @@ python app/scripts/test_auth.py
 
 **Example Output:**
 
-```
+```text
 🔍 Testing JWT authentication...
 📁 Found token in: /tmp/fenrir_jwt_token.txt
 🔑 Using JWT token: eyJhbGciOiJIUzI1Ni...
@@ -101,7 +101,7 @@ python app/scripts/seed_local_environment.py
 
 **Example Output:**
 
-```
+```text
 Starting local environment seeding...
 Authentication token retrieved
 Waiting for application to be ready...
@@ -133,7 +133,7 @@ The following changes were made to support JWT authentication:
 ### Key Differences
 
 | Aspect | Legacy (Multi-User Auth) | New (JWT Auth) |
-|--------|--------------------------|----------------|
+| ------ | ------------------------ | -------------- |
 | **Token Generation** | `auth_service.generate_user_token()` | `POST /v1/api/auth/login` |
 | **Header Format** | `X-Auth-Token: <token>` | `Authorization: Bearer <token>` |
 | **Token Expiry** | Manual expiry check | Automatic (24 hours) |
