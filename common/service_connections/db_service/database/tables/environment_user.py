@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     )
 
 
-class SystemUnderTestUserTable(Base):
+class TestEnvUserAccountsTable(Base):
     """SystemUnderTestUser model representing test users for different environments.
 
     Business Logic Documentation:
@@ -105,4 +105,4 @@ class SystemUnderTestUserTable(Base):
         return f"<User(id={self.sut_user_id}, username='{self.username}', email='{self.email}')>"
 
 
-__all__ = ["SystemUnderTestUserTable"]
+__all__ = ["TestEnvUserAccountsTable"]

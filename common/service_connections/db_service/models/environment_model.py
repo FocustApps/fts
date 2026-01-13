@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 # Import centralized database components
 from common.service_connections.db_service.database import (
     EnvironmentTable,
-    SystemUnderTestUserTable,
+    TestEnvUserAccountsTable,
 )
 from common.service_connections.db_service.database.engine import (
     get_database_session as session,
@@ -112,8 +112,8 @@ def query_environment_by_id(
         try:
             env.users_in_environment = [
                 UserModel(
-                    **session.query(SystemUnderTestUserTable)
-                    .filter(SystemUnderTestUserTable.sut_user_id == user[0])
+                    **session.query(TestEnvUserAccountsTable)
+                    .filter(TestEnvUserAccountsTable.sut_user_id == user[0])
                     .first()
                     .__dict__
                 )

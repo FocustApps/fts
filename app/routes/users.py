@@ -28,9 +28,6 @@ from common.service_connections.db_service.models.account_models.user_model impo
 
 API_VERSION = get_base_app_config().api_version or "v1"
 
-user_views_router = APIRouter(prefix="/user", tags=["frontend"], include_in_schema=False)
-
-
 ################ API ROUTES ################
 
 user_api_router = APIRouter(prefix="/user/api", tags=["user"], include_in_schema=True)

@@ -14,7 +14,6 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from app import TEMPLATE_PATH
 from app.routes import API_ROUTERS
 from app.utils import get_project_root
 from app.middleware.https_middleware import HTTPSEnforcementMiddleware
@@ -27,9 +26,6 @@ BASE_CONFIG = get_base_app_config()
 
 logging = create_logging()
 
-
-def get_template_folder() -> Path:
-    return Path(TEMPLATE_PATH)
 
 
 app = FastAPI(
@@ -81,7 +77,6 @@ app.mount(
     app=StaticFiles(directory=f"{get_project_root()}/app/static/"),
     name="static",
 )
-templates = Jinja2Templates(directory=f"{get_template_folder()}")
 
 for router in API_ROUTERS:
     logging.debug(f"Adding router: {router.prefix}")
@@ -111,22 +106,6 @@ async def root_page(request: Request):
     Authentication is handled client-side via JavaScript.
     The page will redirect to login if no valid JWT token is found.
     """
-    # Serve the index page - let client-side JavaScript handle auth checks
-    navigation = {
-        "Environments": "/env/",
-        "Pages": "/pages/",
-        "Identifiers": "/identifiers/",
-    }
 
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "navigation": navigation,
-            "current_user": {
-                "username": "User",
-                "email": "",
-                "is_admin": False,
-            },
-        },
-    )
+    return 
+    

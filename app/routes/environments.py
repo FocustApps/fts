@@ -6,7 +6,6 @@ which environment to test against and which pages/identifiers to use for the tes
 """
 
 from fastapi import Request, APIRouter, Depends
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.db_manager import DB_ENGINE

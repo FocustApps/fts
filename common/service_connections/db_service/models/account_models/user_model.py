@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import Engine
 
 # Import centralized database components
-from common.service_connections.db_service.database import SystemUnderTestUserTable
+from common.service_connections.db_service.database import TestEnvUserAccountsTable
 from common.service_connections.db_service.database.engine import (
     get_database_session as session,
 )
@@ -65,7 +65,7 @@ def insert_user(user: UserModel, engine: Engine) -> int:
         logging.warning("User ID will only be set by the system")
     with session(engine) as db_session:
         user.created_at = datetime.now()
-        db_user = SystemUnderTestUserTable(**user.model_dump())
+        db_user = TestEnvUserAccountsTable(**user.model_dump())
         db_session.add(db_user)
         db_session.commit()
         db_session.refresh(db_user)
@@ -77,8 +77,8 @@ def query_user_by_username(username: str, session: Session, engine: Engine) -> U
     Retrieves a user from the database by username
     """
     user = (
-        session.query(SystemUnderTestUserTable)
-        .filter(SystemUnderTestUserTable.username == username)
+        session.query(TestEnvUserAccountsTable)
+        .filter(TestEnvUserAccountsTable.username == username)
         .first()
     )
     if not user:
@@ -91,8 +91,8 @@ def query_user_by_id(user_id: int, session: Session, engine: Engine) -> UserMode
     Retrieves a user from the database by id
     """
     user = (
-        session.query(SystemUnderTestUserTable)
-        .filter(SystemUnderTestUserTable.sut_user_id == user_id)
+        session.query(TestEnvUserAccountsTable)
+        .filter(TestEnvUserAccountsTable.sut_user_id == user_id)
         .first()
     )
     if not user:
@@ -100,11 +100,11 @@ def query_user_by_id(user_id: int, session: Session, engine: Engine) -> UserMode
     return UserModel(**user.__dict__)
 
 
-def query_all_users(session: Session, engine: Engine) -> List[SystemUnderTestUserTable]:
+def query_all_users(session: Session, engine: Engine) -> List[TestEnvUserAccountsTable]:
     """
     Retrieves all users from the database
     """
-    users = session.query(SystemUnderTestUserTable).all()
+    users = session.query(TestEnvUserAccountsTable).all()
     return [UserModel(**user.__dict__) for user in users]
 
 
@@ -113,7 +113,7 @@ def update_user_by_id(user_id: int, user: UserModel, engine: Engine) -> bool:
     Updates a user in the database
     """
     with session(engine) as db_session:
-        db_user = db_session.get(SystemUnderTestUserTable, user_id)
+        db_user = db_session.get(TestEnvUserAccountsTable, user_id)
         if not db_user:
             raise ValueError(f"User ID {user_id} not found.")
         user.updated_at = datetime.now()
@@ -131,7 +131,7 @@ def drop_user_by_id(user_id: int, engine: Engine) -> bool:
     """
     # TODO: Implement a cascade deletion for the user field in the environment table.
     with session(engine) as db_session:
-        user = db_session.get(SystemUnderTestUserTable, user_id)
+        user = db_session.get(TestEnvUserAccountsTable, user_id)
         db_session.delete(user)
         db_session.commit()
         logging.info(f"User ID {user_id} deleted.")

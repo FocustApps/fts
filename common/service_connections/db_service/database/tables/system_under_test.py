@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from common.service_connections.db_service.database.tables.environment import (
         EnvironmentTable,
     )
-    from common.service_connections.db_service.database.tables.system_under_test_user import (
-        SystemUnderTestUserTable,
+    from common.service_connections.db_service.database.tables.environment_user import (
+        TestEnvUserAccountsTable,
     )
     from common.service_connections.db_service.database.tables.action_tables.user_interface_action.page import (
         PageTable,
@@ -100,7 +100,7 @@ class SystemUnderTestTable(Base):
         secondary="system_environment_association",
         back_populates="systems",
     )
-    users: Mapped[List["SystemUnderTestUserTable"]] = relationship(
+    users: Mapped[List["TestEnvUserAccountsTable"]] = relationship(
         "SystemUnderTestUserTable",
         back_populates="system",
         cascade="all, delete-orphan",

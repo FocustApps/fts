@@ -13,7 +13,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.fenrir_app import app
-from app.services.multi_user_auth_service import get_multi_user_auth_service
 from app.services.email_service import EmailServiceError
 from common.app_logging import create_logging
 from common.service_connections.db_service.database import (
@@ -53,11 +52,6 @@ class TestAuthUsersAPI:
     def client(self):
         """Create a test client for FastAPI app."""
         return TestClient(app)
-
-    @pytest.fixture
-    def auth_service(self):
-        """Get the multi-user auth service."""
-        return get_multi_user_auth_service()
 
     @pytest.fixture
     def test_admin_email(self):

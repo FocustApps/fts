@@ -26,7 +26,7 @@ from common.service_connections.db_service.models.user_interface_models.page_mod
     query_all_pages,
     query_page_by_id,
 )
-from app import TEMPLATE_PATH
+
 from common.app_logging import create_logging
 
 logger = create_logging()

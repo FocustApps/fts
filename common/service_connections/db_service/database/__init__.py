@@ -19,7 +19,7 @@ from common.service_connections.db_service.database.tables import (
     # Existing tables
     PageTable,
     EnvironmentTable,
-    SystemUnderTestUserTable,
+    TestEnvUserAccountsTable,
     IdentifierTable,
     EmailProcessorTable,
     AuthUserTable,
@@ -66,7 +66,7 @@ __all__ = [
     # Existing tables
     "PageTable",
     "EnvironmentTable",
-    "SystemUnderTestUserTable",
+    "TestEnvUserAccountsTable",
     "IdentifierTable",
     "EmailProcessorTable",
     "AuthUserTable",

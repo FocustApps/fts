@@ -11,8 +11,8 @@ from common.service_connections.db_service.database.tables.action_tables.user_in
 from common.service_connections.db_service.database.tables.environment import (
     EnvironmentTable,
 )
-from common.service_connections.db_service.database.tables.system_under_test_user import (
-    SystemUnderTestUserTable,
+from common.service_connections.db_service.database.tables.environment_user import (
+    TestEnvUserAccountsTable,
 )
 from common.service_connections.db_service.database.tables.action_tables.user_interface_action.identifier import (
     IdentifierTable,
@@ -76,7 +76,7 @@ __all__ = [
     # Existing tables
     "PageTable",
     "EnvironmentTable",
-    "SystemUnderTestUserTable",
+    "TestEnvUserAccountsTable",
     "IdentifierTable",
     "FenrirActionsTable",
     "EmailProcessorTable",

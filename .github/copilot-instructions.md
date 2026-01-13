@@ -4,6 +4,11 @@
 
 Fenrir is a **multi-application test automation hub** with a **service-oriented architecture** that abstracts cloud connections, databases, and selenium testing workflows. The system follows a **dual-environment pattern** with Azure deployments (MSSQL) and local development (PostgreSQL).
 
+The application uses a **decoupled frontend-backend architecture**:
+- **Backend**: FastAPI REST API with JWT authentication
+- **Frontend**: React + TypeScript + Vite application in `frontend/` directory
+- **Communication**: JSON API calls from React to FastAPI endpoints
+
 ## Database Schema - Source of Truth
 
 **CRITICAL: Database tables are the pure source of truth** for all schema definitions. The SQLAlchemy table models in `common/service_connections/db_service/database/tables/` define the authoritative schema.
@@ -120,7 +125,8 @@ Tests must follow these patterns:
 
 ### Core Components
 
-- **`fenrir_app.py`** - FastAPI application with HTML/API dual routing
+- **`fenrir_app.py`** - FastAPI REST API backend
+- **`frontend/`** - React + TypeScript + Vite application
 - **`focustapps/`** - Individual application test suites (OCR, SafeCheck, TimeTracker, etc.)
 - **`services/`** - Shared business logic (database, cloud, reporting, messaging)
 - **`common/`** - Selenium automation framework and utilities
@@ -198,6 +204,11 @@ uv export --format=requirements-txt --output-file=requirements.txt  # Export for
 # Local development with containers
 sh run-fenrir-app.sh      # Full docker-compose stack with PostgreSQL
 sh entrypoint.sh          # Local app only (requires Azure MSSQL access)
+
+# After making changes to app/ directory, copy to container and restart
+docker compose cp app/. fenrir:/fenrir/app/ && docker compose restart fenrir
+# Then check logs to verify successful restart:
+docker compose logs fenrir --tail=50
 ```
 
 ### Testing Execution Patterns
@@ -211,12 +222,17 @@ pytest -m "requires_data"            # Tests requiring live data
 cd docker/grid_compose && sh grid-helpers.sh
 ```
 
-### FastAPI Route Pattern
-Routes follow **dual API/view structure** with HTMX integration:
+### FastAPI REST API Pattern
+Routes follow **pure REST API pattern** for React frontend consumption:
 ```python
-# In app/routes/*.py - Always create both API and view routers
-router_name_api_router = APIRouter(prefix="/api/name", tags=["api"])
-router_name_views_router = APIRouter(prefix="/name", tags=["views"]) 
+# In app/routes/*.py - API routers serve JSON for frontend
+router_name_api_router = APIRouter(prefix="/v1/api/name", tags=["api"])
+
+@router_name_api_router.get("/", response_model=List[ModelResponse])
+async def get_items(current_user: TokenPayload = Depends(get_current_user)):
+    """All endpoints return JSON, authenticated via JWT."""
+    # Return Pydantic models that serialize to JSON
+    return items
 ```
 
 ## Application-Specific Patterns
@@ -292,18 +308,88 @@ python checks/check_missing_tables.py  # Confirm all tables created
 
 The workspace uses specific configurations for the multi-language codebase:
 - **PostgreSQL syntax** for .sql files (`"*.sql": "postgres"`)
-- **Black formatter** with 90-character line length
+- **Black formatter** with 90-character line length for Python
 - **Pytest discovery** on save with class-based test execution
-- **HTMX** and **Bootstrap** integration for FastAPI frontend
+- **ESLint + Prettier** for TypeScript/React formatting
+- **TypeScript strict mode** enabled in frontend/
 
-## App layer (FastAPI + HTMX + Jinja)
+## Frontend Layer (React + TypeScript + Vite)
 
-For app-specific guidance under `/app`, see `.github/app-instructions.md`.
+### Directory Structure
+```
+frontend/
+├── src/
+│   ├── api/           # API client functions for backend calls
+│   ├── components/    # Reusable React components
+│   ├── pages/         # Route-level page components
+│   ├── hooks/         # Custom React hooks
+│   ├── types/         # TypeScript type definitions
+│   ├── utils/         # Utility functions
+│   └── App.tsx        # Root application component
+├── vite.config.ts     # Vite configuration
+└── tsconfig.json      # TypeScript configuration
+```
 
-Quick rules:
-- Always create dual routers per feature: API and Views (Views: `include_in_schema=False`).
-- Use `Jinja2Templates`; pass dataclass payloads as primitives or via `.model_dump()`.
-- HTMX views render server-side partials; re-init JS behaviors after `htmx:afterSwap`.
-- Table partial (`app/templates/table.html`): fixed layout + ellipsis, tooltip on hover, copy icon on truncated cells, re-bind after swaps and on resize.
-- Enum dropdowns: pass `[(e.value, label)]` pairs; in templates, handle both enum and string for `selected`.
-- WorkItem routes: GET new/edit pass `system_enum` + `work_item`; POST/PATCH parse and persist `system`.
+### Best Practices
+
+**API Communication**:
+```typescript
+// Use dedicated API client with JWT token management
+// frontend/src/api/client.ts
+export const apiClient = {
+  get: async <T>(url: string): Promise<T> => {
+    const token = sessionStorage.getItem('access_token');
+    const response = await fetch(`/v1/api${url}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
+  }
+};
+```
+
+**Type Safety**:
+- Define TypeScript interfaces matching Pydantic models from backend
+- Use strict mode: `"strict": true` in tsconfig.json
+- Never use `any` - always define proper types
+- Generate types from OpenAPI schema when possible
+
+**Component Patterns**:
+- Use functional components with hooks (not class components)
+- Implement React Query/TanStack Query for data fetching and caching
+- Use React Router for client-side routing
+- Implement proper error boundaries for error handling
+
+**State Management**:
+- Use React Context for global state (auth, theme, user)
+- Use React Query for server state (API data)
+- Use local state (useState) for component-specific state
+- Avoid Redux unless complex state management is absolutely required
+
+**Authentication**:
+- Store JWT access token in `sessionStorage` (24-hour expiry)
+- Store refresh token in `localStorage` or `sessionStorage` based on remember-me
+- Implement token refresh logic before expiry
+- Use protected route wrapper components for authenticated pages
+
+**Build & Development**:
+```bash
+cd frontend
+npm run dev          # Development server with HMR
+npm run build        # Production build
+npm run preview      # Preview production build
+npm run lint         # ESLint
+npm run type-check   # TypeScript type checking
+```
+
+**Proxy Configuration**:
+```typescript
+// vite.config.ts - Proxy API calls to FastAPI backend in development
+export default defineConfig({
+  server: {
+    proxy: {
+      '/v1/api': 'http://localhost:8080',
+      '/health': 'http://localhost:8080'
+    }
+  }
+});
+```
