@@ -2,7 +2,7 @@
 Database model functions for JWT refresh tokens.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -165,7 +165,7 @@ def update_token_inactive(token_id: str, engine: Engine) -> bool:
         db_token = db_session.get(AuthTokenTable, token_id)
         if db_token:
             db_token.is_active = False
-            db_token.revoked_at = datetime.utcnow()
+            db_token.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db_session.commit()
             return True
         return False
@@ -183,7 +183,7 @@ def update_all_user_tokens_inactive(user_id: str, engine: Engine) -> int:
         Number of tokens deactivated
     """
     with session(engine) as db_session:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         result = (
             db_session.query(AuthTokenTable)
             .filter(
@@ -214,7 +214,7 @@ def update_all_family_tokens_inactive(family_id: str, engine: Engine) -> int:
         Number of tokens deactivated
     """
     with session(engine) as db_session:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         result = (
             db_session.query(AuthTokenTable)
             .filter(
@@ -247,7 +247,7 @@ def update_token_last_used(token_id: str, engine: Engine) -> bool:
     with session(engine) as db_session:
         db_token = db_session.get(AuthTokenTable, token_id)
         if db_token:
-            db_token.last_used_at = datetime.utcnow()
+            db_token.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db_session.commit()
             return True
         return False
@@ -265,7 +265,9 @@ def delete_inactive_tokens_older_than(days: int, engine: Engine) -> int:
         Number of tokens deleted
     """
     with session(engine) as db_session:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            days=days
+        )
         result = (
             db_session.query(AuthTokenTable)
             .filter(

@@ -303,8 +303,8 @@ class TestSessionsEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert "sessions" in data
-        assert len(data["sessions"]) == 2
+        assert isinstance(data, list)
+        assert len(data) == 2
 
     def test_revoke_session(self, client, test_email):
         """Test revoking specific session."""
@@ -332,7 +332,8 @@ class TestSessionsEndpoints:
             "/api/auth/sessions", headers={"Authorization": f"Bearer {access_token1}"}
         )
 
-        session_id = sessions_response.json()["sessions"][1]["token_id"]
+        sessions = sessions_response.json()
+        session_id = sessions[1]["token_id"]
 
         # Revoke second session
         response = client.delete(
@@ -364,7 +365,7 @@ class TestPasswordResetEndpoints:
         )
 
         assert response.status_code == 200
-        assert "email sent" in response.json()["message"].lower()
+        assert "password reset" in response.json()["message"].lower()
 
     def test_reset_password(self, client, test_email):
         """Test password reset completion."""

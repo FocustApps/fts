@@ -163,6 +163,7 @@ def auth_user_factory(engine: Engine, session: Session):
                 username=username or f"testuser{counter:03d}",
                 first_name=f"Test",
                 last_name=f"User{counter:03d}",
+                password_hash="$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7fKm0u/E3G",  # bcrypt hash of "testpassword"
                 is_active=True,
                 is_admin=is_admin,
                 is_super_admin=is_super_admin,

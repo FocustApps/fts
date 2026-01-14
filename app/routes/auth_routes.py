@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.config import get_base_app_config
 from app.models.auth_models import (
     RegisterRequest,
     LoginRequest,
@@ -27,6 +28,9 @@ from common.service_connections.db_service.db_manager import DB_ENGINE
 
 logger = logging.getLogger(__name__)
 
+# Get config for rate limiting
+config = get_base_app_config()
+
 # Create router
 auth_api_router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
@@ -34,8 +38,22 @@ auth_api_router = APIRouter(prefix="/api/auth", tags=["authentication"])
 limiter = Limiter(key_func=get_remote_address)
 
 
-@auth_api_router.post("/register", response_model=dict, include_in_schema=True)
-@limiter.limit("5/hour")
+# Helper to conditionally apply rate limiting
+def conditional_limit(limit_string: str):
+    """Apply rate limit only if enabled in config."""
+
+    def decorator(func):
+        if config.rate_limit_enabled:
+            return limiter.limit(limit_string)(func)
+        return func
+
+    return decorator
+
+
+@auth_api_router.post(
+    "/register", response_model=dict, include_in_schema=True, status_code=201
+)
+@conditional_limit("5/hour")
 async def register(request: Request, register_data: RegisterRequest):
     """
     Register a new user account.
@@ -54,11 +72,12 @@ async def register(request: Request, register_data: RegisterRequest):
     return {
         "message": "User registered successfully",
         "email": user.email,
+        "username": user.username,
     }
 
 
 @auth_api_router.post("/login", response_model=TokenResponse, include_in_schema=True)
-@limiter.limit("10/minute")
+@conditional_limit("10/minute")
 async def login(request: Request, login_data: LoginRequest):
     """
     Authenticate user and return JWT tokens.
@@ -80,7 +99,7 @@ async def login(request: Request, login_data: LoginRequest):
 
 
 @auth_api_router.post("/refresh", response_model=TokenResponse, include_in_schema=True)
-@limiter.limit("30/minute")
+@conditional_limit("30/minute")
 async def refresh(request: Request, refresh_data: RefreshRequest):
     """
     Refresh access and refresh tokens.
@@ -191,7 +210,7 @@ async def revoke_session(token_id: str, current_user=Depends(get_current_user)):
 @auth_api_router.post(
     "/password-reset-request", response_model=dict, include_in_schema=True
 )
-@limiter.limit("3/hour")
+@conditional_limit("3/hour")
 async def password_reset_request(request: Request, reset_data: PasswordResetRequest):
     """
     Request a password reset.
@@ -226,7 +245,7 @@ async def password_reset_request(request: Request, reset_data: PasswordResetRequ
 
 
 @auth_api_router.post("/password-reset", response_model=dict, include_in_schema=True)
-@limiter.limit("5/hour")
+@conditional_limit("5/hour")
 async def password_reset(request: Request, reset_data: PasswordReset):
     """
     Complete password reset with token.

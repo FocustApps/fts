@@ -101,7 +101,7 @@ class SystemUnderTestTable(Base):
         back_populates="systems",
     )
     users: Mapped[List["TestEnvUserAccountsTable"]] = relationship(
-        "SystemUnderTestUserTable",
+        "TestEnvUserAccountsTable",
         back_populates="system",
         cascade="all, delete-orphan",
     )

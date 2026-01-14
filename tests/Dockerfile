@@ -28,4 +28,4 @@ COPY . .
 ENV PYTHONPATH=/fenrir
 
 # Default command runs all tests
-CMD ["pytest", "tests/", "-v", "--tb=short"]
+CMD ["sh", "run-tests.sh"]

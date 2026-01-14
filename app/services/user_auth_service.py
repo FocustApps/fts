@@ -6,7 +6,7 @@ logout, password reset, and session management.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from uuid import uuid4
 
@@ -87,7 +87,7 @@ class UserAuthService:
             password_hash=password_hash,
             is_active=True,
             is_admin=False,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
         user = insert_auth_user(user, session, self.engine)
@@ -150,7 +150,7 @@ class UserAuthService:
         )
 
         # Calculate expiry
-        expires_at = datetime.utcnow() + timedelta(
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             days=self.config.jwt_refresh_token_expire_days
         )
 
@@ -165,13 +165,13 @@ class UserAuthService:
             device_info=device_info,
             ip_address=ip_address,
             is_active=True,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
         insert_auth_token(token_model, self.engine)
 
         # Update user last login
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
         update_auth_user_by_id(user.auth_user_id, user, session, self.engine)
 
         logger.info(f"User authenticated: {user.email}")
@@ -250,13 +250,19 @@ class UserAuthService:
                 raise HTTPException(status_code=401, detail="Invalid refresh token")
 
             # Check if token is expired
-            if current_token.token_expires_at < datetime.utcnow():
+            if current_token.token_expires_at < datetime.now(timezone.utc).replace(
+                tzinfo=None
+            ):
                 update_token_inactive(current_token.token_id, self.engine)
                 raise HTTPException(status_code=401, detail="Refresh token expired")
 
             # Get user
+            user_record = db_session.get(AuthUserTable, current_token.auth_user_id)
+            if not user_record:
+                raise HTTPException(status_code=401, detail="User not found")
+
             user = query_auth_user_by_email(
-                db_session.query(AuthUserTable).get(current_token.auth_user_id).email,
+                user_record.email,
                 session,
                 self.engine,
             )
@@ -280,7 +286,7 @@ class UserAuthService:
             )
 
             # Calculate new expiry
-            new_expires_at = datetime.utcnow() + timedelta(
+            new_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
                 days=self.config.jwt_refresh_token_expire_days
             )
 
@@ -295,7 +301,7 @@ class UserAuthService:
                 device_info=device_info or current_token.device_info,
                 ip_address=ip_address or current_token.ip_address,
                 is_active=True,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
 
             insert_auth_token(new_token, self.engine)
@@ -345,7 +351,7 @@ class UserAuthService:
             update_token_inactive(current_token.token_id, self.engine)
 
             # Revoke access token JTI
-            access_expiry = datetime.utcnow() + timedelta(
+            access_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
                 hours=self.config.jwt_access_token_expire_hours
             )
             self.jwt_service.revoke_token(current_token.access_token_jti, access_expiry)
@@ -368,7 +374,7 @@ class UserAuthService:
             active_tokens = query_active_tokens_by_user(user_id, db_session, self.engine)
 
             # Revoke all access token JTIs
-            access_expiry = datetime.utcnow() + timedelta(
+            access_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
                 hours=self.config.jwt_access_token_expire_hours
             )
             for token in active_tokens:
@@ -431,7 +437,7 @@ class UserAuthService:
             update_token_inactive(token_id, self.engine)
 
             # Revoke access token JTI
-            access_expiry = datetime.utcnow() + timedelta(
+            access_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
                 hours=self.config.jwt_access_token_expire_hours
             )
             self.jwt_service.revoke_token(token.access_token_jti, access_expiry)
@@ -462,7 +468,9 @@ class UserAuthService:
 
         # Generate reset token
         reset_token = self.password_service.generate_reset_token()
-        reset_expires = datetime.utcnow() + timedelta(hours=1)
+        reset_expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+            hours=1
+        )
 
         # Update user with reset token
         user.password_reset_token = reset_token
@@ -502,7 +510,8 @@ class UserAuthService:
             # Check if token is expired
             if (
                 not user.password_reset_expires
-                or user.password_reset_expires < datetime.utcnow()
+                or user.password_reset_expires
+                < datetime.now(timezone.utc).replace(tzinfo=None)
             ):
                 raise HTTPException(status_code=400, detail="Reset token expired")
 

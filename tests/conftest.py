@@ -14,6 +14,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 
+# Disable rate limiting for tests BEFORE importing app modules
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
 # Load environment variables for database connection
 load_dotenv()
 
@@ -91,21 +94,6 @@ def mock_logger():
     """Create a mock logger for testing."""
     with patch("app.services.auth_service.logger") as mock_log:
         yield mock_log
-
-
-@pytest.fixture(autouse=True)
-def cleanup_auth_service():
-    """Automatically cleanup auth service after each test."""
-    yield
-
-    # Cleanup global auth service if it exists
-    try:
-        from app.services.auth_service import shutdown_auth_service
-
-        shutdown_auth_service()
-    except (RuntimeError, ImportError):
-        # Service not initialized or module not available
-        pass
 
 
 @pytest.fixture(scope="function")

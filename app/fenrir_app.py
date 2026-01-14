@@ -2,12 +2,12 @@
 Fenrir Fast API application
 """
 
+# Import python_multipart to prevent deprecation warning from Starlette
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pathlib import Path
 
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -25,7 +25,6 @@ from app.config import get_base_app_config
 BASE_CONFIG = get_base_app_config()
 
 logging = create_logging()
-
 
 
 app = FastAPI(
@@ -80,9 +79,12 @@ app.mount(
 
 for router in API_ROUTERS:
     logging.debug(f"Adding router: {router.prefix}")
-    # Auth view routes should be at root level (no API version prefix)
-    if (router.prefix == "/auth" and "auth-views" in router.tags) or (
-        router.prefix == "/auth-users" and "auth-users-views" in router.tags
+    # Auth routes should be at root level (no API version prefix)
+    # This includes both view routes and API auth routes
+    if (
+        (router.prefix == "/auth" and "auth-views" in router.tags)
+        or (router.prefix == "/auth-users" and "auth-users-views" in router.tags)
+        or (router.prefix == "/api/auth")  # Auth API routes remain unversioned
     ):
         app.include_router(router)
     else:
@@ -107,5 +109,4 @@ async def root_page(request: Request):
     The page will redirect to login if no valid JWT token is found.
     """
 
-    return 
-    
+    return
