@@ -1,4 +1,5 @@
 from app.routes import (
+    accounts,  # Multi-tenant account management
     actions,  # Migrated to JWT auth
     audit_logs,  # Read-only audit trail
     auth_routes,
@@ -19,6 +20,7 @@ from app.routes import (
 
 API_ROUTERS = [
     auth_routes.auth_api_router,  # JWT auth API routes
+    accounts.accounts_api_router,  # Multi-tenant account management
     environments.env_api_router,
     pages.page_api_router,
     identifiers.identifiers_api_router,

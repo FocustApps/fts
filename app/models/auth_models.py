@@ -8,13 +8,17 @@ from pydantic import BaseModel, EmailStr
 
 
 class TokenPayload(BaseModel):
-    """JWT token payload structure."""
+    """JWT token payload structure with multi-tenant account context."""
 
     user_id: str
     email: str
     is_admin: bool
     exp: datetime
     jti: str
+    # Multi-tenant fields
+    is_super_admin: bool = False
+    account_id: Optional[str] = None
+    account_role: Optional[str] = None
 
 
 class TokenResponse(BaseModel):

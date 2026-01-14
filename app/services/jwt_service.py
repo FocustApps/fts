@@ -32,14 +32,25 @@ class JWTService:
         if not self.secret_key:
             raise ValueError("JWT_SECRET_KEY must be set in environment variables")
 
-    def create_access_token(self, user_id: str, email: str, is_admin: bool) -> str:
+    def create_access_token(
+        self,
+        user_id: str,
+        email: str,
+        is_admin: bool,
+        is_super_admin: bool = False,
+        account_id: Optional[str] = None,
+        account_role: Optional[str] = None,
+    ) -> str:
         """
-        Create a new JWT access token.
+        Create a new JWT access token with multi-tenant account context.
 
         Args:
             user_id: User's database ID
             email: User's email address
-            is_admin: Whether user has admin privileges
+            is_admin: Whether user has admin privileges (deprecated, use is_super_admin)
+            is_super_admin: Whether user is a super admin (can access all accounts)
+            account_id: User's active account ID (from primary account or account switch)
+            account_role: User's role in the active account (owner/admin/member/viewer)
 
         Returns:
             Encoded JWT token string
@@ -51,6 +62,9 @@ class JWTService:
             "sub": email,
             "user_id": user_id,
             "is_admin": is_admin,
+            "is_super_admin": is_super_admin,
+            "account_id": account_id,
+            "account_role": account_role,
             "exp": expire,
             "jti": str(uuid4()),  # Unique token ID for revocation
         }
@@ -119,6 +133,9 @@ class JWTService:
             user_id = payload.get("user_id")
             email = payload.get("sub")
             is_admin = payload.get("is_admin", False)
+            is_super_admin = payload.get("is_super_admin", False)
+            account_id = payload.get("account_id")
+            account_role = payload.get("account_role")
             exp = datetime.fromtimestamp(payload.get("exp"), tz=timezone.utc)
             jti = payload.get("jti")
 
@@ -145,6 +162,9 @@ class JWTService:
                 user_id=user_id,
                 email=email,
                 is_admin=is_admin,
+                is_super_admin=is_super_admin,
+                account_id=account_id,
+                account_role=account_role,
                 exp=exp,
                 jti=jti,
             )

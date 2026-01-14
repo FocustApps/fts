@@ -258,11 +258,10 @@ def query_audit_log_by_id(
     Returns:
         AuditLogModel if found, None otherwise
     """
-    with session(engine) as db_session:
-        audit = db_session.get(AuditLogTable, audit_id)
-        if audit:
-            return AuditLogModel(**audit.__dict__)
-        return None
+    audit = session.get(AuditLogTable, audit_id)
+    if audit:
+        return AuditLogModel(**audit.__dict__)
+    return None
 
 
 def query_audit_logs_by_entity(

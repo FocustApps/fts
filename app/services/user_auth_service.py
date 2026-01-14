@@ -132,11 +132,27 @@ class UserAuthService:
         # Create token family for rotation tracking
         token_family_id = str(uuid4())
 
+        # Get user's primary account and role for token context
+        from common.service_connections.db_service.models.account_models.account_user_association_model import (
+            query_user_primary_account,
+        )
+
+        with session(self.engine) as db_session:
+            primary_account = query_user_primary_account(
+                user.auth_user_id, db_session, self.engine
+            )
+
+        account_id = primary_account.account_id if primary_account else None
+        account_role = primary_account.role if primary_account else None
+
         # Generate access and refresh tokens
         access_token = self.jwt_service.create_access_token(
             user_id=user.auth_user_id,
             email=user.email,
             is_admin=user.is_admin,
+            is_super_admin=getattr(user, "is_super_admin", False),
+            account_id=account_id,
+            account_role=account_role,
         )
 
         # Decode to get JTI
@@ -270,11 +286,26 @@ class UserAuthService:
             if not user or not user.is_active:
                 raise HTTPException(status_code=401, detail="User not found or inactive")
 
+            # Get user's primary account and role for token context
+            from common.service_connections.db_service.models.account_models.account_user_association_model import (
+                query_user_primary_account,
+            )
+
+            primary_account = query_user_primary_account(
+                user.auth_user_id, db_session, self.engine
+            )
+
+            account_id = primary_account.account_id if primary_account else None
+            account_role = primary_account.role if primary_account else None
+
             # Generate new access and refresh tokens
             new_access_token = self.jwt_service.create_access_token(
                 user_id=user.auth_user_id,
                 email=user.email,
                 is_admin=user.is_admin,
+                is_super_admin=getattr(user, "is_super_admin", False),
+                account_id=account_id,
+                account_role=account_role,
             )
 
             new_access_payload = self.jwt_service.decode_token(new_access_token)

@@ -59,6 +59,7 @@ class AuthUserAccountAssociation(Base):
         nullable=False,
     )
     role: Mapped[str] = mapped_column(sql.String(64), nullable=False, default="member")
+    is_primary: Mapped[bool] = mapped_column(sql.Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(sql.Boolean, nullable=False, default=True)
     invited_by_user_id: Mapped[Optional[str]] = mapped_column(
         sql.String(36),
