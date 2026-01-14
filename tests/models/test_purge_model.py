@@ -10,7 +10,7 @@ Tests cover:
 """
 
 import pytest
-from datetime import timedelta
+from datetime import timedelta, datetime, UTC
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -190,13 +190,13 @@ class TestPurgeDueCalculations:
 
         # Act - Simulate purge operation completing
         # Note: PostgreSQL returns timezone-naive datetimes
-        before_purge = datetime.utcnow()
+        before_purge = datetime.now(UTC)
 
         result = update_last_purged_at(
             purge_id=schedule_id, purged_at=None, engine=engine
         )
 
-        after_purge = datetime.utcnow()
+        after_purge = datetime.now(UTC)
 
         # Assert
         assert result is True

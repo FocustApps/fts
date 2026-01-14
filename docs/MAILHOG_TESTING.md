@@ -50,15 +50,6 @@ from app.services.email_interface import get_email_service
 # Automatically returns MailHogService or SMTPService based on config
 email_service = get_email_service()
 
-# Send email (works with both providers)
-email_service.send_token_notification(
-    user_email="user@example.com",
-    token="abc123token",
-    username="John Doe",
-    is_new_user=True
-)
-```
-
 ### Configuration
 
 **Environment Variables:**

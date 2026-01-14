@@ -38,25 +38,6 @@ class EmailServiceInterface(ABC):
         pass
 
     @abstractmethod
-    def send_token_notification(
-        self,
-        user_email: str,
-        token: str,
-        username: Optional[str] = None,
-        is_new_user: bool = False,
-    ) -> None:
-        """
-        Send authentication token notification email.
-
-        Args:
-            user_email: Recipient email address
-            token: Authentication token
-            username: Optional username for personalization
-            is_new_user: Whether this is a welcome email
-        """
-        pass
-
-    @abstractmethod
     def is_available(self) -> bool:
         """
         Check if email service is properly configured and available.

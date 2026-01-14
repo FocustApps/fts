@@ -39,31 +39,6 @@ class TestMailHogIntegration:
         body = mailhog.get_email_body(message)
         assert "This is a test email body" in body
 
-    def test_send_token_notification_email(self, mailhog: MailHogTestHelper):
-        """Test sending token notification email."""
-        test_token = "abc123def456token789012345678901234567890123456789012345678901234"
-
-        # Send token notification
-        send_multiuser_token_notification(
-            user_email="newuser@test.com",
-            token=test_token,
-            username="Test User",
-            is_new_user=True,
-        )
-
-        # Assert email received and extract token
-        message, extracted_token = mailhog.assert_token_email_sent(
-            to_email="newuser@test.com", timeout=5
-        )
-
-        # Verify token matches
-        assert extracted_token == test_token
-
-        # Verify email content
-        body = mailhog.get_email_body(message)
-        assert "Welcome to the Fenrir Testing System, Test User!" in body
-        assert "Token:" in body
-
     def test_search_multiple_emails(self, mailhog: MailHogTestHelper):
         """Test searching for emails with different criteria."""
         # Send multiple emails

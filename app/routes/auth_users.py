@@ -7,7 +7,7 @@ Provides admin interface for managing JWT-authenticated users:
 - Deactivating/reactivating users
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
 
@@ -232,7 +232,7 @@ async def toggle_user_status_api(
                 )
 
             user.is_active = is_active
-            user.updated_at = datetime.utcnow()
+            user.updated_at = datetime.now(UTC)
             db_session.commit()
 
             status = "activated" if is_active else "deactivated"

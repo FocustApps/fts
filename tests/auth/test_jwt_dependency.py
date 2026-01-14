@@ -6,7 +6,7 @@ use Depends() and can't be called directly.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 
@@ -176,7 +176,7 @@ class TestProtectedRoute:
         config = get_base_app_config()
         from jose import jwt
 
-        expired_time = datetime.utcnow() - timedelta(hours=1)
+        expired_time = datetime.now(UTC) - timedelta(hours=1)
         payload = {
             "sub": user.email,
             "user_id": user.auth_user_id,

@@ -2,7 +2,7 @@
 Database model functions for revoked tokens.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.engine import Engine
 
@@ -61,7 +61,7 @@ def delete_expired_revoked_tokens(engine: Engine) -> int:
         Number of deleted records
     """
     with session(engine) as db_session:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         result = (
             db_session.query(RevokedTokenTable)
             .filter(RevokedTokenTable.expires_at < now)
