@@ -8,12 +8,15 @@ This module provides:
 4. Polymorphic query helpers for tag-based entity filtering
 """
 
+from __future__ import annotations
+
 import logging
 import threading
 import traceback
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import and_, func, select
 from sqlalchemy.engine import Engine
@@ -27,6 +30,9 @@ from common.service_connections.db_service.database.engine import (
 from common.service_connections.db_service.database.tables.entity_tag import (
     EntityTagTable,
 )
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 logger = logging.getLogger(__name__)
 
@@ -442,23 +448,35 @@ def query_tags_for_entity(
     entity_type: str,
     entity_id: str,
     account_id: str,
+    token: TokenPayload,
     db_session: Session,
     engine: Engine,
     active_only: bool = True,
 ) -> List[EntityTagModel]:
-    """Query all tags for a specific entity.
+    """Query all tags for a specific entity with account access validation.
 
     Args:
         entity_type: Type of entity (suite, test_case, etc.)
         entity_id: Entity's primary key
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         active_only: If True, only return active tags
 
     Returns:
         List of EntityTagModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query tags for a different account",
+        )
+
     with session(engine) as db_session:
         query = db_session.query(EntityTagTable).filter(
             and_(
@@ -479,23 +497,35 @@ def query_entities_by_tag(
     tag_name: str,
     entity_type: str,
     account_id: str,
+    token: TokenPayload,
     db_session: Session,
     engine: Engine,
     active_only: bool = True,
 ) -> List[str]:
-    """Query entity IDs that have a specific tag.
+    """Query entity IDs that have a specific tag with account access validation.
 
     Args:
         tag_name: Tag name to search for
         entity_type: Type of entity to filter (suite, test_case, etc.)
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         active_only: If True, only return tags on active entities
 
     Returns:
         List of entity_id strings
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query entities for a different account",
+        )
+
     query = db_session.query(EntityTagTable.entity_id).filter(
         and_(
             EntityTagTable.tag_name == tag_name,
@@ -514,16 +544,18 @@ def query_entities_by_tag(
 def query_tags_by_category(
     tag_category: str,
     account_id: str,
+    token: TokenPayload,
     db_session: Session,
     engine: Engine,
     entity_type: Optional[str] = None,
     active_only: bool = True,
 ) -> List[EntityTagModel]:
-    """Query all tags in a specific category.
+    """Query all tags in a specific category with account access validation.
 
     Args:
         tag_category: Tag category to filter by
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         entity_type: Optional entity type filter
@@ -531,7 +563,17 @@ def query_tags_by_category(
 
     Returns:
         List of EntityTagModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query tags for a different account",
+        )
+
     filters = [
         EntityTagTable.tag_category == tag_category,
         EntityTagTable.account_id == account_id,
@@ -551,21 +593,33 @@ def query_tags_by_category(
 
 def query_unique_tag_names(
     account_id: str,
+    token: TokenPayload,
     db_session: Session,
     engine: Engine,
     entity_type: Optional[str] = None,
 ) -> List[str]:
-    """Query unique tag names for autocomplete/dropdown.
+    """Query unique tag names for autocomplete/dropdown with account access validation.
 
     Args:
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         entity_type: Optional entity type filter
 
     Returns:
         Sorted list of unique tag names
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query tags for a different account",
+        )
+
     filters = [EntityTagTable.account_id == account_id]
 
     if entity_type:

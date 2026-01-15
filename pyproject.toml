@@ -79,6 +79,7 @@ markers = [
     "requires_data",
     "asyncio",
 ]
+filterwarnings = ["ignore::PendingDeprecationWarning:starlette.formparsers"]
 
 [tool.pylint]
 disable = ["E1101"]

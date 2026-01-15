@@ -5,10 +5,13 @@ This module provides the SystemUnderTestModel Pydantic model and database operat
 for managing system under test records in the Fenrir Testing System.
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
 from datetime import datetime, timezone
 import logging
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
@@ -18,6 +21,9 @@ from common.service_connections.db_service.database.engine import (
     get_database_session as session,
 )
 from common.config import should_validate_write
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 
 class SystemUnderTestModel(BaseModel):
@@ -154,9 +160,29 @@ def drop_system_under_test_by_id(sut_id: str, session: Session, engine: Engine) 
 
 
 def query_systems_under_test_by_account(
-    account_id: str, session: Session, engine: Engine
+    account_id: str, token: TokenPayload, session: Session, engine: Engine
 ) -> List[SystemUnderTestModel]:
-    """Query active systems under test filtered by account_id."""
+    """Query active systems under test filtered by account_id with account access validation.
+
+    Args:
+        account_id: Account ID to filter by
+        token: JWT token payload for authorization
+        session: Active database session
+        engine: Database engine
+
+    Returns:
+        List of SystemUnderTestModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
+    """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query systems for a different account",
+        )
+
     systems = (
         session.query(SystemUnderTestTable)
         .filter(SystemUnderTestTable.account_id == account_id)

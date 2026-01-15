@@ -9,7 +9,11 @@ from common.service_connections.db_service.db_manager import DB_ENGINE
 from common.service_connections.db_service.database.engine import (
     get_database_session as get_session,
 )
-from app.dependencies.jwt_auth_dependency import get_current_user
+from app.dependencies.authorization_dependency import (
+    require_member,
+    require_admin,
+    validate_account_access,
+)
 from app.models.auth_models import TokenPayload
 
 from common.service_connections.db_service.models.plan_model import (
@@ -28,12 +32,12 @@ from common.service_connections.db_service.models.plan_model import (
 )
 
 
-plan_api_router = APIRouter(prefix="/v1/api/plans", tags=["plans-api"])
+plan_api_router = APIRouter(prefix="/api/plans", tags=["plans-api"])
 
 
 @plan_api_router.get("/", response_model=List[PlanModel])
 async def get_all_plans(
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_member),
 ):
     """Get all test plans."""
     with get_session(DB_ENGINE) as db_session:
@@ -43,19 +47,23 @@ async def get_all_plans(
 @plan_api_router.get("/account/{account_id}", response_model=List[PlanModel])
 async def get_plans_by_account(
     account_id: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_member),
 ):
     """Get all test plans for a specific account."""
+    validate_account_access(current_user, account_id)
     with get_session(DB_ENGINE) as db_session:
         return query_plans_by_account(
-            account_id=account_id, db_session=db_session, engine=DB_ENGINE
+            account_id=account_id,
+            token=current_user,
+            db_session=db_session,
+            engine=DB_ENGINE,
         )
 
 
 @plan_api_router.get("/owner/{owner_user_id}", response_model=List[PlanModel])
 async def get_plans_by_owner(
     owner_user_id: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_member),
 ):
     """Get all test plans owned by a specific user."""
     with get_session(DB_ENGINE) as db_session:
@@ -67,7 +75,7 @@ async def get_plans_by_owner(
 @plan_api_router.get("/status/{status}", response_model=List[PlanModel])
 async def get_plans_by_status(
     status: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_member),
 ):
     """Get all test plans with a specific status."""
     with get_session(DB_ENGINE) as db_session:
@@ -79,7 +87,7 @@ async def get_plans_by_status(
 @plan_api_router.get("/{plan_id}", response_model=PlanModel)
 async def get_plan_by_id(
     plan_id: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_member),
 ):
     """Get a specific test plan by ID."""
     with get_session(DB_ENGINE) as db_session:
@@ -89,7 +97,7 @@ async def get_plan_by_id(
 @plan_api_router.post("/", response_model=PlanModel)
 async def create_plan(
     plan: PlanModel,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Create a new test plan."""
     plan_id = insert_plan(model=plan, engine=DB_ENGINE)
@@ -101,7 +109,7 @@ async def create_plan(
 async def update_plan_endpoint(
     plan_id: str,
     plan: PlanModel,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Update a test plan."""
     update_plan(plan_id=plan_id, updates=plan, engine=DB_ENGINE)
@@ -113,7 +121,7 @@ async def update_plan_endpoint(
 async def update_plan_status_endpoint(
     plan_id: str,
     status: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Update the status of a test plan."""
     update_plan_status(plan_id=plan_id, new_status=status, engine=DB_ENGINE)
@@ -123,7 +131,7 @@ async def update_plan_status_endpoint(
 @plan_api_router.patch("/{plan_id}/deactivate")
 async def deactivate_plan_endpoint(
     plan_id: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Deactivate a test plan (soft delete)."""
     deactivate_plan(
@@ -135,7 +143,7 @@ async def deactivate_plan_endpoint(
 @plan_api_router.patch("/{plan_id}/reactivate")
 async def reactivate_plan_endpoint(
     plan_id: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Reactivate a previously deactivated test plan."""
     reactivate_plan(plan_id=plan_id, engine=DB_ENGINE)
@@ -145,8 +153,9 @@ async def reactivate_plan_endpoint(
 @plan_api_router.delete("/{plan_id}")
 async def delete_plan(
     plan_id: str,
-    current_user: TokenPayload = Depends(get_current_user),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Hard delete a test plan."""
-    drop_plan(plan_id=plan_id, engine=DB_ENGINE)
+    with get_session(DB_ENGINE) as db_session:
+        drop_plan(plan_id=plan_id, engine=DB_ENGINE, db_session=db_session)
     return {"status": "success", "message": f"Plan {plan_id} deleted"}

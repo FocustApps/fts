@@ -7,7 +7,7 @@ from typing import Optional
 from uuid import uuid4
 import logging
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -35,8 +35,7 @@ class InAppNotificationModel(BaseModel):
     priority: str = "normal"  # low, normal, high, urgent
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationSummary(BaseModel):

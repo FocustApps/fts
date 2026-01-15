@@ -5,10 +5,13 @@ This module provides the TestCaseModel Pydantic model and database operations
 for managing test case records in the Fenrir Testing System.
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
 from datetime import datetime, timezone
 import logging
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
@@ -19,6 +22,9 @@ from common.service_connections.db_service.database.engine import (
     get_database_session as session,
 )
 from common.config import should_validate_write
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 
 class TestCaseModel(BaseModel):
@@ -167,9 +173,29 @@ def drop_test_case_by_id(test_case_id: str, session: Session, engine: Engine) ->
 
 
 def query_test_cases_by_account(
-    account_id: str, session: Session, engine: Engine
+    account_id: str, token: TokenPayload, session: Session, engine: Engine
 ) -> List[TestCaseModel]:
-    """Query active test cases filtered by account_id."""
+    """Query active test cases filtered by account_id with account access validation.
+
+    Args:
+        account_id: Account ID to filter by
+        token: JWT token payload for authorization
+        session: Active database session
+        engine: Database engine
+
+    Returns:
+        List of TestCaseModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
+    """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query test cases for a different account",
+        )
+
     test_cases = (
         session.query(TestCaseTable)
         .filter(TestCaseTable.account_id == account_id)

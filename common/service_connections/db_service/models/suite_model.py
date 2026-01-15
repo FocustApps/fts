@@ -5,10 +5,13 @@ This module provides the SuiteModel Pydantic model and database operations
 for managing test suite records in the Fenrir Testing System.
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
 from datetime import datetime, timezone
 import logging
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
@@ -18,6 +21,9 @@ from common.service_connections.db_service.database.engine import (
     get_database_session as session,
 )
 from common.config import should_validate_write
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 
 class SuiteModel(BaseModel):
@@ -142,9 +148,29 @@ def drop_suite_by_id(suite_id: str, session: Session, engine: Engine) -> int:
 
 
 def query_suites_by_account(
-    account_id: str, session: Session, engine: Engine
+    account_id: str, token: TokenPayload, session: Session, engine: Engine
 ) -> List[SuiteModel]:
-    """Query active suites filtered by account_id."""
+    """Query active suites filtered by account_id with account access validation.
+
+    Args:
+        account_id: Account ID to filter by
+        token: JWT token payload for authorization
+        session: Active database session
+        engine: Database engine
+
+    Returns:
+        List of SuiteModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
+    """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query suites for a different account",
+        )
+
     suites = (
         session.query(SuiteTable)
         .filter(SuiteTable.account_id == account_id)

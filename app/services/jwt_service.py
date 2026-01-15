@@ -40,6 +40,8 @@ class JWTService:
         is_super_admin: bool = False,
         account_id: Optional[str] = None,
         account_role: Optional[str] = None,
+        impersonated_by: Optional[str] = None,
+        impersonation_started_at: Optional[datetime] = None,
     ) -> str:
         """
         Create a new JWT access token with multi-tenant account context.
@@ -51,6 +53,8 @@ class JWTService:
             is_super_admin: Whether user is a super admin (can access all accounts)
             account_id: User's active account ID (from primary account or account switch)
             account_role: User's role in the active account (owner/admin/member/viewer)
+            impersonated_by: Super admin user_id who is impersonating (if any)
+            impersonation_started_at: Timestamp when impersonation started
 
         Returns:
             Encoded JWT token string
@@ -68,6 +72,13 @@ class JWTService:
             "exp": expire,
             "jti": str(uuid4()),  # Unique token ID for revocation
         }
+
+        # Add impersonation metadata if present
+        if impersonated_by:
+            payload["impersonated_by"] = impersonated_by
+            payload["impersonation_started_at"] = (
+                impersonation_started_at.isoformat() if impersonation_started_at else None
+            )
 
         encoded_jwt = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
         return encoded_jwt
@@ -138,6 +149,14 @@ class JWTService:
             account_role = payload.get("account_role")
             exp = datetime.fromtimestamp(payload.get("exp"), tz=timezone.utc)
             jti = payload.get("jti")
+            # Impersonation fields
+            impersonated_by = payload.get("impersonated_by")
+            impersonation_started_at_str = payload.get("impersonation_started_at")
+            impersonation_started_at = (
+                datetime.fromisoformat(impersonation_started_at_str)
+                if impersonation_started_at_str
+                else None
+            )
 
             if not all([user_id, email, jti]):
                 raise HTTPException(status_code=401, detail="Invalid token claims")
@@ -167,6 +186,8 @@ class JWTService:
                 account_role=account_role,
                 exp=exp,
                 jti=jti,
+                impersonated_by=impersonated_by,
+                impersonation_started_at=impersonation_started_at,
             )
 
         except ExpiredSignatureError:

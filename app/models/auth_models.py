@@ -19,6 +19,9 @@ class TokenPayload(BaseModel):
     is_super_admin: bool = False
     account_id: Optional[str] = None
     account_role: Optional[str] = None
+    # Impersonation tracking
+    impersonated_by: Optional[str] = None  # Super admin user_id who is impersonating
+    impersonation_started_at: Optional[datetime] = None
 
 
 class TokenResponse(BaseModel):

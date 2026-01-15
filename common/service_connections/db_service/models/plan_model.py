@@ -8,10 +8,13 @@ This module provides:
 4. Plan execution status management
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import and_
 from sqlalchemy.engine import Engine
@@ -25,6 +28,9 @@ from common.service_connections.db_service.database.tables.plan import PlanTable
 from common.service_connections.db_service.models.plan_suite_helpers import (
     add_suite_to_plan,
 )
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 logger = logging.getLogger(__name__)
 
@@ -327,19 +333,34 @@ def reactivate_plan(plan_id: str, engine: Engine) -> bool:
 
 
 def query_plans_by_account(
-    account_id: str, db_session: Session, engine: Engine, active_only: bool = True
+    account_id: str,
+    token: TokenPayload,
+    db_session: Session,
+    engine: Engine,
+    active_only: bool = True,
 ) -> List[PlanModel]:
-    """Query all plans for an account.
+    """Query all plans for an account with account access validation.
 
     Args:
         account_id: Account ID to filter by
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         active_only: If True, only return active plans
 
     Returns:
         List of PlanModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query plans for a different account",
+        )
+
     with session(engine) as db_session:
         query = db_session.query(PlanTable).filter(PlanTable.account_id == account_id)
 
