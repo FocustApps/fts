@@ -5,9 +5,11 @@
 Fenrir is a **multi-application test automation hub** with a **service-oriented architecture** that abstracts cloud connections, databases, and selenium testing workflows. The system follows a **dual-environment pattern** with Azure deployments (MSSQL) and local development (PostgreSQL).
 
 The application uses a **decoupled frontend-backend architecture**:
-- **Backend**: FastAPI REST API with JWT authentication
-- **Frontend**: React + TypeScript + Vite application in `frontend/` directory
+- **Backend**: FastAPI REST API with JWT authentication (runs in Docker container)
+- **Database**: PostgreSQL database (runs in Docker container)
+- **Frontend**: React + TypeScript + Vite application in `frontend/` directory (runs on host)
 - **Communication**: JSON API calls from React to FastAPI endpoints
+- **Deployment**: Backend and database run via `docker-compose.yml` - do not attempt to start them manually
 
 ## Database Schema - Source of Truth
 
@@ -196,6 +198,20 @@ fenrir.find_element(By.ID, "element-id")  # Preferred over driver.find_element()
 
 ### Package Management (Updated for UV)
 ```bash
+# Use UV for dependency management (replaced Poetry)
+uv sync                    # Install dependencies
+uv add package-name       # Add new package
+uv export --format=requirements-txt --output-file=requirements.txt  # Export for CI
+
+# Local development with containers
+sh run-fenrir-app.sh      # Full docker-compose stack with PostgreSQL
+sh entrypoint.sh          # Local app only (requires Azure MSSQL access)
+
+# After making changes to app/ directory, copy to container and restart
+docker compose cp app/. fenrir:/fenrir/app/ && docker compose restart fenrir
+# Then check logs to verify successful restart:
+docker compose logs fenrir --tail=50
+```
 # Use UV for dependency management (replaced Poetry)
 uv sync                    # Install dependencies
 uv add package-name       # Add new package

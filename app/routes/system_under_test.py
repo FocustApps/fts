@@ -73,7 +73,7 @@ async def create_system(
     current_user: TokenPayload = Depends(require_admin),
 ):
     """Create a new system under test."""
-    sut_id = insert_system_under_test(system=system, engine=DB_ENGINE)
+    sut_id = insert_system_under_test(system_under_test=system, engine=DB_ENGINE)
     with get_session(DB_ENGINE) as db_session:
         return query_system_under_test_by_id(
             sut_id=sut_id, session=db_session, engine=DB_ENGINE
@@ -87,7 +87,9 @@ async def update_system(
     current_user: TokenPayload = Depends(require_admin),
 ):
     """Update a system under test."""
-    update_system_under_test_by_id(sut_id=sut_id, system=system, engine=DB_ENGINE)
+    update_system_under_test_by_id(
+        sut_id=sut_id, system_under_test=system, engine=DB_ENGINE
+    )
     with get_session(DB_ENGINE) as db_session:
         return query_system_under_test_by_id(
             sut_id=sut_id, session=db_session, engine=DB_ENGINE

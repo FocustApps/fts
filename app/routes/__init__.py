@@ -11,6 +11,7 @@ from app.routes import (
     environments,  # Migrated to JWT auth
     identifiers,  # Migrated to JWT auth
     impersonation,  # Super admin impersonation
+    me,  # Current user /me endpoints
     notifications,  # In-app notifications and preferences
     pages,  # Migrated to JWT auth
     plans,  # Test execution plans
@@ -29,6 +30,7 @@ API_ROUTERS = [
     account_associations.account_associations_api_router,  # User-account associations
     account_switching.account_switching_api_router,  # Account switching
     impersonation.impersonation_api_router,  # Super admin impersonation
+    me.users_me_api_router,  # Current user /me endpoints
     super_admin_dashboard.super_admin_dashboard_api_router,  # Super admin dashboard
     notifications.notification_preferences_api_router,  # Notification preferences
     notifications.notifications_api_router,  # In-app notifications

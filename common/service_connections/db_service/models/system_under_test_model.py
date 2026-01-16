@@ -76,9 +76,13 @@ class SystemUnderTestModel(BaseModel):
 
 
 def insert_system_under_test(
-    system_under_test: SystemUnderTestModel, session: Session, engine: Engine
-) -> SystemUnderTestModel:
-    """Create a new system under test in the database."""
+    system_under_test: SystemUnderTestModel, engine: Engine
+) -> str:
+    """Create a new system under test in the database.
+
+    Returns:
+        str: The sut_id of the created system.
+    """
     if system_under_test.sut_id:
         system_under_test.sut_id = None
         logging.warning("System Under Test ID will only be set by the system")
@@ -90,7 +94,7 @@ def insert_system_under_test(
         db_session.commit()
         db_session.refresh(db_sut)
 
-    return SystemUnderTestModel(**db_sut.__dict__)
+    return db_sut.sut_id
 
 
 def query_system_under_test_by_id(
