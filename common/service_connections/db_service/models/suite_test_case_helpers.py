@@ -14,6 +14,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 
 from common.service_connections.db_service.database.tables.suite import SuiteTable
 from common.service_connections.db_service.database.tables.suite_test_case_association import (
@@ -66,7 +69,6 @@ def add_test_case_to_suite(
     test_case_id: str,
     execution_order: int,
     engine: Engine,
-    session: Session,
     is_enabled: bool = True,
 ) -> str:
     """Add a test case to a suite with specified execution order.
@@ -93,7 +95,7 @@ def add_test_case_to_suite(
         is_active=is_enabled,
     )
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify suite exists
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:
@@ -117,7 +119,7 @@ def remove_test_case_from_suite(
     suite_id: str,
     test_case_id: str,
     engine: Engine,
-    session: Session,
+    db_session: Session,
     soft_delete: bool = True,
 ) -> bool:
     """Remove a test case from a suite.
@@ -135,7 +137,7 @@ def remove_test_case_from_suite(
     Raises:
         SQLAlchemyError: If database operation fails
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         assoc = (
             db_session.query(SuiteTestCaseAssociation)
             .filter(
@@ -160,7 +162,7 @@ def remove_test_case_from_suite(
 
 
 def reorder_suite_test_cases(
-    suite_id: str, ordered_test_case_ids: List[str], engine: Engine, session: Session
+    suite_id: str, ordered_test_case_ids: List[str], engine: Engine
 ) -> int:
     """Reorder test cases in a suite by updating execution_order.
 
@@ -177,7 +179,7 @@ def reorder_suite_test_cases(
         ValueError: If test case IDs don't match existing associations
         SQLAlchemyError: If database operation fails
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         # Get all active associations for suite
         assocs = (
             db_session.query(SuiteTestCaseAssociation)
@@ -217,7 +219,7 @@ def update_test_case_execution_order(
     test_case_id: str,
     new_execution_order: int,
     engine: Engine,
-    session: Session,
+    db_session: Session,
 ) -> bool:
     """Update execution order for a single test case in a suite.
 
@@ -238,7 +240,7 @@ def update_test_case_execution_order(
     if new_execution_order < 0:
         raise ValueError(f"execution_order must be >= 0, got {new_execution_order}")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         assoc = (
             db_session.query(SuiteTestCaseAssociation)
             .filter(
@@ -264,7 +266,7 @@ def update_test_case_execution_order(
 
 
 def query_suite_with_test_cases(
-    suite_id: str, session: Session, engine: Engine, active_only: bool = True
+    suite_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> Optional[SuiteWithTestCasesModel]:
     """Query a suite with all its test cases in execution order.
 
@@ -277,7 +279,7 @@ def query_suite_with_test_cases(
     Returns:
         SuiteWithTestCasesModel with populated test_cases list, or None if suite not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         # Get suite
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:
@@ -313,7 +315,7 @@ def query_suite_with_test_cases(
         for test_case, exec_order, assoc_is_active in results:
             test_case_dict = {
                 "test_case_id": test_case.test_case_id,
-                "test_case_name": test_case.test_case_name,
+                "test_case_name": test_case.test_name,
                 "test_type": test_case.test_type,
                 "execution_order": exec_order,
                 "is_active": test_case.is_active,
@@ -324,14 +326,14 @@ def query_suite_with_test_cases(
         return SuiteWithTestCasesModel(
             suite_id=suite.suite_id,
             suite_name=suite.suite_name,
-            suite_description=suite.suite_description,
+            suite_description=suite.description,
             account_id=suite.account_id,
             test_cases=test_cases,
         )
 
 
 def query_test_cases_for_suite(
-    suite_id: str, session: Session, engine: Engine, active_only: bool = True
+    suite_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> List[str]:
     """Query test case IDs in a suite in execution order.
 
@@ -344,7 +346,7 @@ def query_test_cases_for_suite(
     Returns:
         List of test_case_id strings in execution order
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = (
             db_session.query(SuiteTestCaseAssociation.test_case_id)
             .filter(SuiteTestCaseAssociation.suite_id == suite_id)
@@ -359,7 +361,7 @@ def query_test_cases_for_suite(
 
 
 def query_suites_for_test_case(
-    test_case_id: str, session: Session, engine: Engine, active_only: bool = True
+    test_case_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> List[str]:
     """Query suite IDs that contain a test case.
 
@@ -372,7 +374,7 @@ def query_suites_for_test_case(
     Returns:
         List of suite_id strings
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(SuiteTestCaseAssociation.suite_id).filter(
             SuiteTestCaseAssociation.test_case_id == test_case_id
         )
@@ -385,7 +387,7 @@ def query_suites_for_test_case(
 
 
 def get_suite_test_count(
-    suite_id: str, session: Session, engine: Engine, active_only: bool = True
+    suite_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> int:
     """Get count of test cases in a suite.
 
@@ -398,7 +400,7 @@ def get_suite_test_count(
     Returns:
         Number of test cases in suite
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(
             func.count(SuiteTestCaseAssociation.association_id)
         ).filter(SuiteTestCaseAssociation.suite_id == suite_id)
@@ -418,7 +420,6 @@ def bulk_add_test_cases_to_suite(
     suite_id: str,
     test_case_ids: List[str],
     engine: Engine,
-    session: Session,
     starting_order: int = 0,
 ) -> List[str]:
     """Add multiple test cases to a suite in a single transaction.
@@ -439,7 +440,7 @@ def bulk_add_test_cases_to_suite(
     """
     assoc_ids = []
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify suite exists
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:
@@ -471,7 +472,6 @@ def replace_suite_test_cases(
     suite_id: str,
     new_test_case_ids: List[str],
     engine: Engine,
-    session: Session,
     soft_delete_old: bool = True,
 ) -> Dict[str, List[str]]:
     """Replace all test cases in a suite.
@@ -480,7 +480,7 @@ def replace_suite_test_cases(
         suite_id: Suite to update
         new_test_case_ids: New list of test case IDs (in execution order)
         engine: Database engine
-        session: Session active database session
+        db_session: Session active database session
         soft_delete_old: If True, soft delete old associations; if False, hard delete
 
     Returns:
@@ -492,7 +492,7 @@ def replace_suite_test_cases(
     """
     result = {"removed": [], "added": []}
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Verify suite exists
         suite = db_session.get(SuiteTable, suite_id)
         if not suite:

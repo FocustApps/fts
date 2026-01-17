@@ -5,16 +5,25 @@ This module provides the SuiteModel Pydantic model and database operations
 for managing test suite records in the Fenrir Testing System.
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
 from datetime import datetime, timezone
 import logging
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.database import SuiteTable
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.config import should_validate_write
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 
 class SuiteModel(BaseModel):
@@ -65,37 +74,39 @@ class SuiteModel(BaseModel):
 ################ Suite CRUD Operations ################
 
 
-def insert_suite(suite: SuiteModel, session: Session, engine: Engine) -> SuiteModel:
-    """Create a new suite in the database."""
+def insert_suite(suite: SuiteModel, engine: Engine) -> str:
+    """Create a new suite in the database.
+
+    Returns:
+        suite_id (str): The ID of the created suite
+    """
     if suite.suite_id:
         suite.suite_id = None
         logging.warning("Suite ID will only be set by the system")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         suite.created_at = datetime.now(timezone.utc)
         db_suite = SuiteTable(**suite.model_dump())
         db_session.add(db_suite)
         db_session.commit()
         db_session.refresh(db_suite)
+        suite_id = db_suite.suite_id
 
-    return SuiteModel(**db_suite.__dict__)
+    return suite_id
 
 
 def query_suite_by_id(suite_id: str, session: Session, engine: Engine) -> SuiteModel:
     """Retrieve a suite by ID."""
-    with session() as db_session:
-        db_suite = (
-            db_session.query(SuiteTable).filter(SuiteTable.suite_id == suite_id).first()
-        )
-        if not db_suite:
-            raise ValueError(f"Suite ID {suite_id} not found.")
+    db_suite = session.query(SuiteTable).filter(SuiteTable.suite_id == suite_id).first()
+    if not db_suite:
+        raise ValueError(f"Suite ID {suite_id} not found.")
 
     return SuiteModel(**db_suite.__dict__)
 
 
 def query_all_suites(session: Session, engine: Engine) -> List[SuiteModel]:
     """Retrieve all active suites."""
-    with session() as db_session:
+    with session(engine) as db_session:
         suites = db_session.query(SuiteTable).filter(SuiteTable.is_active == True).all()
         return [SuiteModel(**suite.__dict__) for suite in suites]
 
@@ -104,7 +115,7 @@ def update_suite_by_id(
     suite_id: str, suite: SuiteModel, session: Session, engine: Engine
 ) -> SuiteModel:
     """Update an existing suite."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")
@@ -123,7 +134,7 @@ def update_suite_by_id(
 
 def drop_suite_by_id(suite_id: str, session: Session, engine: Engine) -> int:
     """Hard delete a suite (use with caution - prefer soft delete)."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")
@@ -137,24 +148,43 @@ def drop_suite_by_id(suite_id: str, session: Session, engine: Engine) -> int:
 
 
 def query_suites_by_account(
-    account_id: str, session: Session, engine: Engine
+    account_id: str, token: TokenPayload, session: Session, engine: Engine
 ) -> List[SuiteModel]:
-    """Query active suites filtered by account_id."""
-    with session() as db_session:
-        suites = (
-            db_session.query(SuiteTable)
-            .filter(SuiteTable.account_id == account_id)
-            .filter(SuiteTable.is_active == True)
-            .all()
+    """Query active suites filtered by account_id with account access validation.
+
+    Args:
+        account_id: Account ID to filter by
+        token: JWT token payload for authorization
+        session: Active database session
+        engine: Database engine
+
+    Returns:
+        List of SuiteModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
+    """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query suites for a different account",
         )
-        return [SuiteModel(**suite.__dict__) for suite in suites]
+
+    suites = (
+        session.query(SuiteTable)
+        .filter(SuiteTable.account_id == account_id)
+        .filter(SuiteTable.is_active == True)
+        .all()
+    )
+    return [SuiteModel(**suite.__dict__) for suite in suites]
 
 
 def query_suites_by_owner(
     owner_user_id: str, session: Session, engine: Engine
 ) -> List[SuiteModel]:
     """Query active suites owned by a specific user."""
-    with session() as db_session:
+    with session(engine) as db_session:
         suites = (
             db_session.query(SuiteTable)
             .filter(SuiteTable.owner_user_id == owner_user_id)
@@ -168,7 +198,7 @@ def query_suites_by_sut(
     sut_id: str, session: Session, engine: Engine
 ) -> List[SuiteModel]:
     """Query active suites for a specific system under test."""
-    with session() as db_session:
+    with session(engine) as db_session:
         suites = (
             db_session.query(SuiteTable)
             .filter(SuiteTable.sut_id == sut_id)
@@ -182,7 +212,7 @@ def deactivate_suite_by_id(
     suite_id: str, deactivated_by_user_id: str, session: Session, engine: Engine
 ) -> SuiteModel:
     """Soft delete a suite."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")
@@ -199,7 +229,7 @@ def deactivate_suite_by_id(
 
 def reactivate_suite_by_id(suite_id: str, session: Session, engine: Engine) -> SuiteModel:
     """Reactivate a soft-deleted suite."""
-    with session() as db_session:
+    with session(engine) as db_session:
         db_suite = db_session.get(SuiteTable, suite_id)
         if not db_suite:
             raise ValueError(f"Suite ID {suite_id} not found.")

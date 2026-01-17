@@ -50,7 +50,7 @@ class AuthUserAccountAssociation(Base):
     )
     auth_user_id: Mapped[str] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.id", ondelete="CASCADE"),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="CASCADE"),
         nullable=False,
     )
     account_id: Mapped[str] = mapped_column(
@@ -59,10 +59,11 @@ class AuthUserAccountAssociation(Base):
         nullable=False,
     )
     role: Mapped[str] = mapped_column(sql.String(64), nullable=False, default="member")
+    is_primary: Mapped[bool] = mapped_column(sql.Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(sql.Boolean, nullable=False, default=True)
     invited_by_user_id: Mapped[Optional[str]] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.id", ondelete="SET NULL"),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

@@ -5,16 +5,25 @@ This module provides the SystemUnderTestModel Pydantic model and database operat
 for managing system under test records in the Fenrir Testing System.
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
 from datetime import datetime, timezone
 import logging
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from common.service_connections.db_service.database import SystemUnderTestTable
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.config import should_validate_write
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 
 class SystemUnderTestModel(BaseModel):
@@ -67,35 +76,38 @@ class SystemUnderTestModel(BaseModel):
 
 
 def insert_system_under_test(
-    system_under_test: SystemUnderTestModel, session: Session, engine: Engine
-) -> SystemUnderTestModel:
-    """Create a new system under test in the database."""
+    system_under_test: SystemUnderTestModel, engine: Engine
+) -> str:
+    """Create a new system under test in the database.
+
+    Returns:
+        str: The sut_id of the created system.
+    """
     if system_under_test.sut_id:
         system_under_test.sut_id = None
         logging.warning("System Under Test ID will only be set by the system")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         system_under_test.created_at = datetime.now(timezone.utc)
         db_sut = SystemUnderTestTable(**system_under_test.model_dump())
         db_session.add(db_sut)
         db_session.commit()
         db_session.refresh(db_sut)
 
-    return SystemUnderTestModel(**db_sut.__dict__)
+    return db_sut.sut_id
 
 
 def query_system_under_test_by_id(
     sut_id: str, session: Session, engine: Engine
 ) -> SystemUnderTestModel:
     """Retrieve a system under test by ID."""
-    with session() as db_session:
-        db_sut = (
-            db_session.query(SystemUnderTestTable)
-            .filter(SystemUnderTestTable.sut_id == sut_id)
-            .first()
-        )
-        if not db_sut:
-            raise ValueError(f"System Under Test ID {sut_id} not found.")
+    db_sut = (
+        session.query(SystemUnderTestTable)
+        .filter(SystemUnderTestTable.sut_id == sut_id)
+        .first()
+    )
+    if not db_sut:
+        raise ValueError(f"System Under Test ID {sut_id} not found.")
 
     return SystemUnderTestModel(**db_sut.__dict__)
 
@@ -104,20 +116,23 @@ def query_all_systems_under_test(
     session: Session, engine: Engine
 ) -> List[SystemUnderTestModel]:
     """Retrieve all active systems under test."""
-    with session() as db_session:
-        systems = (
-            db_session.query(SystemUnderTestTable)
-            .filter(SystemUnderTestTable.is_active == True)
-            .all()
-        )
-        return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
+    systems = (
+        session.query(SystemUnderTestTable)
+        .filter(SystemUnderTestTable.is_active == True)
+        .all()
+    )
+    return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
 
 
 def update_system_under_test_by_id(
-    sut_id: str, system_under_test: SystemUnderTestModel, session: Session, engine: Engine
-) -> SystemUnderTestModel:
-    """Update an existing system under test."""
-    with session() as db_session:
+    sut_id: str, system_under_test: SystemUnderTestModel, engine: Engine
+) -> bool:
+    """Update an existing system under test.
+
+    Returns:
+        bool: True if successful
+    """
+    with session(engine) as db_session:
         db_sut = db_session.get(SystemUnderTestTable, sut_id)
         if not db_sut:
             raise ValueError(f"System Under Test ID {sut_id} not found.")
@@ -131,18 +146,17 @@ def update_system_under_test_by_id(
         db_session.commit()
         db_session.refresh(db_sut)
 
-    return SystemUnderTestModel(**db_sut.__dict__)
+    return True
 
 
 def drop_system_under_test_by_id(sut_id: str, session: Session, engine: Engine) -> int:
     """Hard delete a system under test (use with caution - prefer soft delete)."""
-    with session() as db_session:
-        db_sut = db_session.get(SystemUnderTestTable, sut_id)
-        if not db_sut:
-            raise ValueError(f"System Under Test ID {sut_id} not found.")
-        db_session.delete(db_sut)
-        db_session.commit()
-        logging.info(f"System Under Test ID {sut_id} deleted.")
+    db_sut = session.get(SystemUnderTestTable, sut_id)
+    if not db_sut:
+        raise ValueError(f"System Under Test ID {sut_id} not found.")
+    session.delete(db_sut)
+    session.commit()
+    logging.info(f"System Under Test ID {sut_id} deleted.")
     return 1
 
 
@@ -150,53 +164,74 @@ def drop_system_under_test_by_id(sut_id: str, session: Session, engine: Engine) 
 
 
 def query_systems_under_test_by_account(
-    account_id: str, session: Session, engine: Engine
+    account_id: str, token: TokenPayload, session: Session, engine: Engine
 ) -> List[SystemUnderTestModel]:
-    """Query active systems under test filtered by account_id."""
-    with session() as db_session:
-        systems = (
-            db_session.query(SystemUnderTestTable)
-            .filter(SystemUnderTestTable.account_id == account_id)
-            .filter(SystemUnderTestTable.is_active == True)
-            .all()
+    """Query active systems under test filtered by account_id with account access validation.
+
+    Args:
+        account_id: Account ID to filter by
+        token: JWT token payload for authorization
+        session: Active database session
+        engine: Database engine
+
+    Returns:
+        List of SystemUnderTestModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
+    """
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query systems for a different account",
         )
-        return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
+
+    systems = (
+        session.query(SystemUnderTestTable)
+        .filter(SystemUnderTestTable.account_id == account_id)
+        .filter(SystemUnderTestTable.is_active == True)
+        .all()
+    )
+    return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
 
 
 def query_systems_under_test_by_owner(
     owner_user_id: str, session: Session, engine: Engine
 ) -> List[SystemUnderTestModel]:
     """Query active systems under test owned by a specific user."""
-    with session() as db_session:
-        systems = (
-            db_session.query(SystemUnderTestTable)
-            .filter(SystemUnderTestTable.owner_user_id == owner_user_id)
-            .filter(SystemUnderTestTable.is_active == True)
-            .all()
-        )
-        return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
+    systems = (
+        session.query(SystemUnderTestTable)
+        .filter(SystemUnderTestTable.owner_user_id == owner_user_id)
+        .filter(SystemUnderTestTable.is_active == True)
+        .all()
+    )
+    return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
 
 
 def query_systems_under_test_by_account_and_owner(
     account_id: str, owner_user_id: str, session: Session, engine: Engine
 ) -> List[SystemUnderTestModel]:
     """Query active systems under test by account and owner (combined filter)."""
-    with session() as db_session:
-        systems = (
-            db_session.query(SystemUnderTestTable)
-            .filter(SystemUnderTestTable.account_id == account_id)
-            .filter(SystemUnderTestTable.owner_user_id == owner_user_id)
-            .filter(SystemUnderTestTable.is_active == True)
-            .all()
-        )
-        return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
+    systems = (
+        session.query(SystemUnderTestTable)
+        .filter(SystemUnderTestTable.account_id == account_id)
+        .filter(SystemUnderTestTable.owner_user_id == owner_user_id)
+        .filter(SystemUnderTestTable.is_active == True)
+        .all()
+    )
+    return [SystemUnderTestModel(**sut.__dict__) for sut in systems]
 
 
 def deactivate_system_under_test_by_id(
-    sut_id: str, deactivated_by_user_id: str, session: Session, engine: Engine
-) -> SystemUnderTestModel:
-    """Soft delete a system under test."""
-    with session() as db_session:
+    sut_id: str, deactivated_by_user_id: str, engine: Engine
+) -> bool:
+    """Soft delete a system under test.
+
+    Returns:
+        bool: True if successful
+    """
+    with session(engine) as db_session:
         db_sut = db_session.get(SystemUnderTestTable, sut_id)
         if not db_sut:
             raise ValueError(f"System Under Test ID {sut_id} not found.")
@@ -208,14 +243,16 @@ def deactivate_system_under_test_by_id(
         db_session.commit()
         db_session.refresh(db_sut)
 
-    return SystemUnderTestModel(**db_sut.__dict__)
+    return True
 
 
-def reactivate_system_under_test_by_id(
-    sut_id: str, session: Session, engine: Engine
-) -> SystemUnderTestModel:
-    """Reactivate a soft-deleted system under test."""
-    with session() as db_session:
+def reactivate_system_under_test_by_id(sut_id: str, engine: Engine) -> bool:
+    """Reactivate a previously soft-deleted system under test.
+
+    Returns:
+        bool: True if successful
+    """
+    with session(engine) as db_session:
         db_sut = db_session.get(SystemUnderTestTable, sut_id)
         if not db_sut:
             raise ValueError(f"System Under Test ID {sut_id} not found.")
@@ -228,4 +265,4 @@ def reactivate_system_under_test_by_id(
         db_session.commit()
         db_session.refresh(db_sut)
 
-    return SystemUnderTestModel(**db_sut.__dict__)
+    return True

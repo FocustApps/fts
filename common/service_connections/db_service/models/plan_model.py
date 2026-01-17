@@ -8,20 +8,29 @@ This module provides:
 4. Plan execution status management
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import and_
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.service_connections.db_service.database.tables.plan import PlanTable
 from common.service_connections.db_service.models.plan_suite_helpers import (
     add_suite_to_plan,
 )
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +127,7 @@ class PlanModel(BaseModel):
 # ============================================================================
 
 
-def insert_plan(model: PlanModel, engine: Engine, session: Session, migrate_suites: bool = True) -> str:
+def insert_plan(model: PlanModel, engine: Engine, migrate_suites: bool = True) -> str:
     """Insert new plan record and optionally migrate legacy suite associations.
 
     Args:
@@ -133,11 +142,17 @@ def insert_plan(model: PlanModel, engine: Engine, session: Session, migrate_suit
         ValueError: If validation fails
         SQLAlchemyError: If database operation fails
     """
+    from uuid import uuid4
+
     plan_dict = model.model_dump(
         exclude_unset=True, exclude={"_migrated_suite_ids", "_migration_required"}
     )
 
-    with session() as db_session:
+    # Generate plan_id if not provided
+    if "plan_id" not in plan_dict or not plan_dict["plan_id"]:
+        plan_dict["plan_id"] = str(uuid4())
+
+    with session(engine) as db_session:
         new_plan = PlanTable(**plan_dict)
         db_session.add(new_plan)
         db_session.commit()
@@ -171,7 +186,7 @@ def insert_plan(model: PlanModel, engine: Engine, session: Session, migrate_suit
 
 
 def query_plan_by_id(
-    plan_id: str, session: Session, engine: Engine
+    plan_id: str, db_session: Session, engine: Engine
 ) -> Optional[PlanModel]:
     """Query plan by plan_id.
 
@@ -183,14 +198,14 @@ def query_plan_by_id(
     Returns:
         PlanModel if found, None otherwise
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if plan:
             return PlanModel(**plan.__dict__)
         return None
 
 
-def query_all_plans(session: Session, engine: Engine) -> List[PlanModel]:
+def query_all_plans(db_session: Session, engine: Engine) -> List[PlanModel]:
     """Query all plans.
 
     Args:
@@ -200,12 +215,12 @@ def query_all_plans(session: Session, engine: Engine) -> List[PlanModel]:
     Returns:
         List of PlanModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plans = db_session.query(PlanTable).all()
         return [PlanModel(**plan.__dict__) for plan in plans]
 
 
-def update_plan(plan_id: str, updates: PlanModel, engine: Engine, session: Session) -> bool:
+def update_plan(plan_id: str, updates: PlanModel, engine: Engine) -> bool:
     """Update plan record.
 
     Args:
@@ -227,7 +242,7 @@ def update_plan(plan_id: str, updates: PlanModel, engine: Engine, session: Sessi
     # Add updated_at timestamp
     update_dict["updated_at"] = datetime.now(timezone.utc)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -239,7 +254,7 @@ def update_plan(plan_id: str, updates: PlanModel, engine: Engine, session: Sessi
         return True
 
 
-def drop_plan(plan_id: str, engine: Engine, session: Session) -> bool:
+def drop_plan(plan_id: str, engine: Engine, db_session: Session) -> bool:
     """Permanently delete plan record.
 
     CASCADE deletes all PlanSuiteAssociation records via foreign key constraint.
@@ -251,7 +266,7 @@ def drop_plan(plan_id: str, engine: Engine, session: Session) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -261,7 +276,7 @@ def drop_plan(plan_id: str, engine: Engine, session: Session) -> bool:
         return True
 
 
-def deactivate_plan(plan_id: str, deactivated_by_user_id: str, engine: Engine, session: Session) -> bool:
+def deactivate_plan(plan_id: str, deactivated_by_user_id: str, engine: Engine) -> bool:
     """Soft delete plan by setting is_active=False.
 
     Args:
@@ -272,7 +287,7 @@ def deactivate_plan(plan_id: str, deactivated_by_user_id: str, engine: Engine, s
     Returns:
         True if deactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -287,7 +302,7 @@ def deactivate_plan(plan_id: str, deactivated_by_user_id: str, engine: Engine, s
         return True
 
 
-def reactivate_plan(plan_id: str, engine: Engine, session: Session) -> bool:
+def reactivate_plan(plan_id: str, engine: Engine) -> bool:
     """Reactivate soft-deleted plan.
 
     Args:
@@ -297,7 +312,7 @@ def reactivate_plan(plan_id: str, engine: Engine, session: Session) -> bool:
     Returns:
         True if reactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False
@@ -318,20 +333,35 @@ def reactivate_plan(plan_id: str, engine: Engine, session: Session) -> bool:
 
 
 def query_plans_by_account(
-    account_id: str, session: Session, engine: Engine, active_only: bool = True
+    account_id: str,
+    token: TokenPayload,
+    db_session: Session,
+    engine: Engine,
+    active_only: bool = True,
 ) -> List[PlanModel]:
-    """Query all plans for an account.
+    """Query all plans for an account with account access validation.
 
     Args:
         account_id: Account ID to filter by
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         active_only: If True, only return active plans
 
     Returns:
         List of PlanModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
-    with session() as db_session:
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query plans for a different account",
+        )
+
+    with session(engine) as db_session:
         query = db_session.query(PlanTable).filter(PlanTable.account_id == account_id)
 
         if active_only:
@@ -342,7 +372,7 @@ def query_plans_by_account(
 
 
 def query_plans_by_owner(
-    owner_user_id: str, session: Session, engine: Engine, active_only: bool = True
+    owner_user_id: str, db_session: Session, engine: Engine, active_only: bool = True
 ) -> List[PlanModel]:
     """Query all plans owned by a user.
 
@@ -355,7 +385,7 @@ def query_plans_by_owner(
     Returns:
         List of PlanModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         query = db_session.query(PlanTable).filter(
             PlanTable.owner_user_id == owner_user_id
         )
@@ -368,7 +398,7 @@ def query_plans_by_owner(
 
 
 def query_plans_by_status(
-    status: str, session: Session, engine: Engine, account_id: Optional[str] = None
+    status: str, db_session: Session, engine: Engine, account_id: Optional[str] = None
 ) -> List[PlanModel]:
     """Query plans by execution status.
 
@@ -381,7 +411,7 @@ def query_plans_by_status(
     Returns:
         List of PlanModel instances
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         filters = [PlanTable.status == status]
 
         if account_id:
@@ -393,14 +423,13 @@ def query_plans_by_status(
         return [PlanModel(**plan.__dict__) for plan in plans]
 
 
-def update_plan_status(plan_id: str, new_status: str, engine: Engine, session: Session) -> bool:
+def update_plan_status(plan_id: str, new_status: str, engine: Engine) -> bool:
     """Update plan execution status.
 
     Args:
         plan_id: Plan ID to update
         new_status: New status ('active' or 'inactive')
         engine: Database engine
-        session: Active database session
     Returns:
         True if updated, False if not found
 
@@ -410,7 +439,7 @@ def update_plan_status(plan_id: str, new_status: str, engine: Engine, session: S
     if new_status not in {"active", "inactive"}:
         raise ValueError(f"Invalid status '{new_status}'. Must be 'active' or 'inactive'")
 
-    with session() as db_session:
+    with session(engine) as db_session:
         plan = db_session.get(PlanTable, plan_id)
         if not plan:
             return False

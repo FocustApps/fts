@@ -46,13 +46,13 @@ class PageFenrirActionAssociation(Base):
     association_id: Mapped[str] = mapped_column(
         sql.String(36), primary_key=True, default=lambda: str(uuid4())
     )
-    page_id: Mapped[str] = mapped_column(
-        sql.String(36),
+    page_id: Mapped[int] = mapped_column(
+        sql.Integer,
         sql.ForeignKey("page.page_id", ondelete="CASCADE"),
         nullable=False,
     )
-    fenrir_action_id: Mapped[str] = mapped_column(
-        sql.String(36),
+    fenrir_action_id: Mapped[int] = mapped_column(
+        sql.Integer,
         sql.ForeignKey("fenrir_actions.fenrir_action_id", ondelete="CASCADE"),
         nullable=False,
     )

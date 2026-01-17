@@ -11,11 +11,14 @@ from common.service_connections.db_service.database.tables.action_tables.user_in
 from common.service_connections.db_service.database.tables.environment import (
     EnvironmentTable,
 )
-from common.service_connections.db_service.database.tables.system_under_test_user import (
-    SystemUnderTestUserTable,
+from common.service_connections.db_service.database.tables.environment_user import (
+    TestEnvUserAccountsTable,
 )
 from common.service_connections.db_service.database.tables.action_tables.user_interface_action.identifier import (
     IdentifierTable,
+)
+from common.service_connections.db_service.database.tables.action_tables.user_interface_action.fenrir_actions import (
+    FenrirActionsTable,
 )
 from common.service_connections.db_service.database.tables.email_processor import (
     EmailProcessorTable,
@@ -31,6 +34,9 @@ from common.service_connections.db_service.database.tables.account_tables.accoun
 from common.service_connections.db_service.database.tables.account_tables.auth_token import (
     AuthTokenTable,
 )
+from common.service_connections.db_service.database.tables.account_tables.revoked_token import (
+    RevokedTokenTable,
+)
 from common.service_connections.db_service.database.tables.audit_log import AuditLogTable
 from common.service_connections.db_service.database.tables.system_under_test import (
     SystemUnderTestTable,
@@ -43,6 +49,9 @@ from common.service_connections.db_service.database.tables.action_chain import (
 )
 from common.service_connections.db_service.database.tables.entity_tag import (
     EntityTagTable,
+)
+from common.service_connections.db_service.database.tables.purge_table import (
+    PurgeTable,
 )
 
 # Junction tables
@@ -67,13 +76,15 @@ __all__ = [
     # Existing tables
     "PageTable",
     "EnvironmentTable",
-    "SystemUnderTestUserTable",
+    "TestEnvUserAccountsTable",
     "IdentifierTable",
+    "FenrirActionsTable",
     "EmailProcessorTable",
     "AuthUserTable",
     # New core tables
     "AccountTable",
     "AuthTokenTable",
+    "RevokedTokenTable",
     "AuditLogTable",
     "SystemUnderTestTable",
     "PlanTable",
@@ -81,6 +92,7 @@ __all__ = [
     "TestCaseTable",
     "ActionChainTable",
     "EntityTagTable",
+    "PurgeTable",
     # Junction tables
     "AuthUserAccountAssociation",
     "PageFenrirActionAssociation",

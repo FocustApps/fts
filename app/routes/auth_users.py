@@ -1,409 +1,85 @@
 """
 Authentication user management routes.
 
-Provides admin interface for managing multi-user authentication:
-- Adding new authenticated users
+Provides admin interface for managing JWT-authenticated users:
+- Adding new authenticated users with account assignments
 - Listing and viewing user details
-- Generating and rotating tokens
-- Deactivating users
+- Deactivating/reactivating users
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from typing import List, Optional
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 from pydantic import BaseModel, EmailStr
 
-from app.dependencies.multi_user_auth_dependency import (
-    verify_admin_auth_token,
-    AuthContext,
+from app.dependencies.jwt_auth_dependency import require_admin
+from app.models.auth_models import TokenPayload, RegisterRequest
+from app.services.user_auth_service import get_user_auth_service
+from common.service_connections.db_service.database.engine import (
+    get_database_session as get_session,
 )
-from app.services.multi_user_auth_service import (
-    get_multi_user_auth_service,
-    MultiUserAuthError,
+from common.service_connections.db_service.database.tables.account_tables.auth_user import (
+    AuthUserTable,
 )
-from common.service_connections.db_service.models.auth_user_model import AuthUserModel
+from common.service_connections.db_service.database.tables.account_tables.account import (
+    AccountTable,
+)
+from common.service_connections.db_service.db_manager import DB_ENGINE
 from common.app_logging import create_logging
-from app.routes.template_dataclasses import ViewRecordDataclass
-
-
-class AuthUserDisplay:
-    """Simple display object for auth users that mimics model behavior for templates."""
-
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-    def __iter__(self):
-        """Allow iteration over attributes for template compatibility."""
-        for key, value in self.__dict__.items():
-            yield (key, value)
-
-    def model_dump(self):
-        """Provide model_dump method for compatibility."""
-        return self.__dict__
 
 
 logger = create_logging()
 
-# Create routers for API and view endpoints
-auth_users_api_router = APIRouter(prefix="/api/auth-users", tags=["auth-users-api"])
-auth_users_views_router = APIRouter(
-    prefix="/auth-users", tags=["auth-users-views"], include_in_schema=False
+
+auth_users_api_router = APIRouter(
+    prefix="/api/auth-users",
+    tags=["auth-users-api"],
 )
 
-# Template configuration
-templates = Jinja2Templates(directory="app/templates")
-
-
-# Pydantic models for API requests
+# Pydantic Models
 class AddUserRequest(BaseModel):
+    """Request model for adding a new user."""
+
     email: EmailStr
     username: Optional[str] = None
+    password: str
+    account_id: str
     is_admin: bool = False
 
 
 class UserResponse(BaseModel):
-    id: int
+    """Response model for user data."""
+
+    auth_user_id: str
     email: str
     username: Optional[str]
     is_admin: bool
     is_active: bool
-    has_token: bool
-    token_expires_at: Optional[datetime]
-    last_login_at: Optional[datetime]
+    account_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime]
 
-    @classmethod
-    def from_auth_user(cls, user: AuthUserModel) -> "UserResponse":
-        """Convert AuthUserModel to API response model."""
-        return cls(
-            id=user.id,
-            email=user.email,
-            username=user.username,
-            is_admin=user.is_admin,
-            is_active=user.is_active,
-            has_token=user.current_token is not None,
-            token_expires_at=user.token_expires_at,
-            last_login_at=user.last_login_at,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
+
+class AuthUserDisplay:
+    """Display object for auth users that works with templates."""
+
+    def __init__(self, user: AuthUserTable, account_name: Optional[str] = None):
+        self.auth_user_id = str(user.auth_user_id)
+        self.email = user.email
+        self.username = user.username or "—"
+        self.is_admin = "Yes" if user.is_admin else "No"
+        self.is_active = "Active" if user.is_active else "Inactive"
+        self.account_name = account_name or "—"
+        self.created_at = user.created_at.strftime("%Y-%m-%d %H:%M UTC")
+        self.updated_at = (
+            user.updated_at.strftime("%Y-%m-%d %H:%M UTC") if user.updated_at else "—"
         )
 
-
-################ VIEW ROUTES ################
-
-
-@auth_users_views_router.get("/", response_class=HTMLResponse)
-async def get_auth_users_view(
-    request: Request, auth_context: AuthContext = Depends(verify_admin_auth_token)
-):
-    """Display the auth users management page."""
-    try:
-        auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=True)
-
-        # Convert to display objects similar to users.py pattern
-        user_data = []
-        for user in users:
-            # Create display object with clean field names
-            user_display = AuthUserDisplay(
-                id=user.id,
-                email=user.email,
-                username=user.username or "—",
-                is_admin="✓" if user.is_admin else "—",
-                is_active="✓" if user.is_active else "—",
-                has_token="✓" if user.current_token else "—",
-                last_login_at=(
-                    user.last_login_at.strftime("%Y-%m-%d %H:%M")
-                    if user.last_login_at
-                    else "Never"
-                ),
-                created_at=user.created_at.strftime("%Y-%m-%d %H:%M"),
-            )
-            user_data.append(user_display)
-
-        # Generate headers dynamically like users.py does
-        if user_data:
-            headers = [
-                key.replace("_", " ").title() for key in user_data[0].model_dump().keys()
-            ]
-        else:
-            headers = [
-                "Id",
-                "Email",
-                "Username",
-                "Is Admin",
-                "Is Active",
-                "Has Token",
-                "Last Login At",
-                "Created At",
-            ]
-
-        return templates.TemplateResponse(
-            "table.html",
-            {
-                "title": "Authentication Users",
-                "request": request,
-                "headers": headers,
-                "table_rows": user_data,
-                "view_url": "get_auth_users_view",
-                "view_record_url": "view_auth_user",
-                "add_url": "new_auth_user_view",
-                "delete_url": "deactivate_auth_user_view",
-            },
-        )
-
-    except Exception as e:
-        logger.error(f"Error loading auth users view: {e}")
-        return templates.TemplateResponse(
-            "error.html",
-            {
-                "request": request,
-                "error_message": "Failed to load authentication users",
-                "error_details": str(e),
-            },
-        )
-
-
-@auth_users_views_router.get("/{record_id}", response_class=HTMLResponse)
-async def view_auth_user(
-    request: Request,
-    record_id: int,
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
-):
-    """Display details for a specific auth user."""
-    try:
-        auth_service = get_multi_user_auth_service()
-        user = auth_service.get_user_by_id(record_id)
-        if not user:
-            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
-
-        # Convert user to dict and mask sensitive data (similar to users.py pattern)
-        user_dict = {
-            "id": user.id,
-            "email": user.email,
-            "username": user.username or "—",
-            "is_admin": "Yes" if user.is_admin else "No",
-            "is_active": "Yes" if user.is_active else "No",
-            "current_token": (
-                "***" if user.current_token else "None"
-            ),  # Mask token like password
-            "token_expires_at": (
-                user.token_expires_at.strftime("%Y-%m-%d %H:%M UTC")
-                if user.token_expires_at
-                else "—"
-            ),
-            "last_login_at": (
-                user.last_login_at.strftime("%Y-%m-%d %H:%M UTC")
-                if user.last_login_at
-                else "Never"
-            ),
-            "created_at": user.created_at.strftime("%Y-%m-%d %H:%M UTC"),
-            "updated_at": (
-                user.updated_at.strftime("%Y-%m-%d %H:%M UTC") if user.updated_at else "—"
-            ),
-        }
-
-        return templates.TemplateResponse(
-            "view_record.html",
-            ViewRecordDataclass(
-                request=request,
-                record=user_dict,
-                view_url="get_auth_users_view",
-                edit_url="edit_auth_user",  # Placeholder for future edit functionality
-            ).model_dump(),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error viewing auth user {record_id}: {e}")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@auth_users_views_router.get("/{record_id}/edit", response_class=HTMLResponse)
-async def edit_auth_user(
-    request: Request,
-    record_id: int,
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
-):
-    """Placeholder for editing auth user - currently not implemented."""
-    return templates.TemplateResponse(
-        "error.html",
-        {
-            "request": request,
-            "error_message": "Edit functionality not yet implemented",
-            "error_details": "User editing is not currently available for authentication users.",
-        },
-    )
-
-
-@auth_users_views_router.get("/new/", response_class=HTMLResponse)
-async def new_auth_user_view(
-    request: Request, auth_context: AuthContext = Depends(verify_admin_auth_token)
-):
-    """Display form for adding a new auth user."""
-    return templates.TemplateResponse(
-        "auth_users/new_user.html",
-        {
-            "request": request,
-            "view_url": "get_auth_users_view",
-        },
-    )
-
-
-@auth_users_views_router.post("/new", response_class=HTMLResponse)
-async def create_auth_user_view(
-    request: Request,
-    email: str = Form(...),
-    username: str = Form(""),
-    is_admin: bool = Form(False),
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
-):
-    """Handle form submission for creating a new auth user."""
-    try:
-        auth_service = get_multi_user_auth_service()
-
-        # Clean up form data
-        username = username.strip() if username else None
-
-        # Add the user
-        new_user = await auth_service.add_user(
-            email=email,
-            username=username,
-            is_admin=is_admin,
-            send_welcome_email=True,  # Send welcome email with token
-        )
-
-        logger.info(f"Created new auth user: {email} (ID: {new_user.id})")
-
-        return """
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <strong>Success!</strong> User created successfully and welcome email sent with authentication token.
-            <a href="/auth-users/{}" class="alert-link">View user details</a>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        """.format(
-            new_user.id
-        )
-
-    except MultiUserAuthError as e:
-        logger.warning(f"Failed to create auth user {email}: {e}")
-        return f"""
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Error!</strong> {str(e)}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        """
-    except Exception as e:
-        logger.error(f"Unexpected error creating auth user {email}: {e}")
-        return """
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Error!</strong> Failed to create user. Please try again.
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        """
-
-
-@auth_users_views_router.post("/{user_id}/generate-token", response_class=HTMLResponse)
-async def generate_token_view(
-    request: Request,
-    user_id: int,
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
-):
-    """Generate a new token for a user (HTMX endpoint)."""
-    try:
-        auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=True)
-
-        user = next((u for u in users if u.id == user_id), None)
-        if not user:
-            return """
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <strong>Error!</strong> User not found.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            """
-
-        if not user.is_active:
-            return """
-            <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                <strong>Warning!</strong> Cannot generate token for inactive user.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            """
-
-        new_token = await auth_service.generate_user_token(user.email, send_email=True)
-        logger.info(f"Generated new token for user: {user.email}")
-
-        return f"""
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <strong>Success!</strong> New token generated and emailed to {user.email}.
-            <br><strong>Token:</strong> <code>{new_token}</code>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        """
-
-    except MultiUserAuthError as e:
-        logger.error(f"Failed to generate token for user {user_id}: {e}")
-        return f"""
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Error!</strong> {str(e)}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        """
-
-
-@auth_users_views_router.post("/{record_id}/deactivate", response_class=HTMLResponse)
-async def deactivate_auth_user_view(
-    request: Request,
-    record_id: int,
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
-):
-    """Deactivate a user (HTMX endpoint)."""
-    try:
-        auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=True)
-
-        user = next((u for u in users if u.id == record_id), None)
-        if not user:
-            return """
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <strong>Error!</strong> User not found.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            """
-
-        success = auth_service.deactivate_user(user.email)
-        if success:
-            logger.info(f"Deactivated auth user: {user.email}")
-            return f"""
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <strong>Success!</strong> User {user.email} has been deactivated.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            """
-        else:
-            return """
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <strong>Error!</strong> Failed to deactivate user.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            """
-
-    except Exception as e:
-        logger.error(f"Error deactivating user {record_id}: {e}")
-        return """
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Error!</strong> Failed to deactivate user. Please try again.
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        """
-
+    def get_display_name(self) -> str:
+        """Get display name for UI."""
+        return self.username if self.username != "—" else self.email
 
 ################ API ROUTES ################
 
@@ -411,14 +87,37 @@ async def deactivate_auth_user_view(
 @auth_users_api_router.get("/users", response_model=List[UserResponse])
 async def list_users_api(
     include_inactive: bool = False,
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
+    account_id: Optional[str] = None,
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """List all authenticated users."""
     try:
-        auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=include_inactive)
+        with get_session(DB_ENGINE) as db_session:
+            query = db_session.query(AuthUserTable)
 
-        return [UserResponse.from_auth_user(user) for user in users]
+            # Filter by active status
+            if not include_inactive:
+                query = query.filter(AuthUserTable.is_active == True)
+
+            # Filter by account if provided
+            if account_id:
+                query = query.filter(AuthUserTable.account_id == account_id)
+
+            users = query.all()
+
+            return [
+                UserResponse(
+                    auth_user_id=str(user.auth_user_id),
+                    email=user.email,
+                    username=user.username,
+                    is_admin=user.is_admin,
+                    is_active=user.is_active,
+                    account_id=str(user.account_id) if user.account_id else None,
+                    created_at=user.created_at,
+                    updated_at=user.updated_at,
+                )
+                for user in users
+            ]
 
     except Exception as e:
         logger.error(f"Error listing users: {e}")
@@ -427,18 +126,29 @@ async def list_users_api(
 
 @auth_users_api_router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user_api(
-    user_id: int, auth_context: AuthContext = Depends(verify_admin_auth_token)
+    user_id: str,
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Get a specific user by ID."""
     try:
-        auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=True)
+        with get_session(DB_ENGINE) as db_session:
+            user = db_session.get(AuthUserTable, user_id)
 
-        user = next((u for u in users if u.id == user_id), None)
-        if not user:
-            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
+            if not user:
+                raise HTTPException(
+                    status_code=HTTP_404_NOT_FOUND, detail="User not found"
+                )
 
-        return UserResponse.from_auth_user(user)
+            return UserResponse(
+                auth_user_id=str(user.auth_user_id),
+                email=user.email,
+                username=user.username,
+                is_admin=user.is_admin,
+                is_active=user.is_active,
+                account_id=str(user.account_id) if user.account_id else None,
+                created_at=user.created_at,
+                updated_at=user.updated_at,
+            )
 
     except HTTPException:
         raise
@@ -450,118 +160,105 @@ async def get_user_api(
 @auth_users_api_router.post("/users", response_model=UserResponse)
 async def create_user_api(
     user_request: AddUserRequest,
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """Create a new authenticated user."""
     try:
-        auth_service = get_multi_user_auth_service()
+        # Validate account exists
+        with get_session(DB_ENGINE) as db_session:
+            account = db_session.get(AccountTable, user_request.account_id)
+            if not account:
+                raise HTTPException(
+                    status_code=HTTP_400_BAD_REQUEST, detail="Selected account not found"
+                )
 
-        new_user = await auth_service.add_user(
+        # Register user
+        auth_service = get_user_auth_service(DB_ENGINE)
+        register_request = RegisterRequest(
             email=user_request.email,
+            password=user_request.password,
             username=user_request.username,
-            is_admin=user_request.is_admin,
-            send_welcome_email=True,
         )
 
-        logger.info(f"Created new auth user via API: {user_request.email}")
-        return UserResponse.from_auth_user(new_user)
+        user = auth_service.register_user(register_request)
 
-    except MultiUserAuthError as e:
-        logger.warning(f"Failed to create user via API: {e}")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error(f"Unexpected error creating user via API: {e}")
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST, detail="Failed to create user"
-        )
+        # Update user with account_id and admin status
+        with get_session(DB_ENGINE) as db_session:
+            db_user = db_session.get(AuthUserTable, user.auth_user_id)
+            db_user.account_id = user_request.account_id
+            db_user.is_admin = user_request.is_admin
+            db_session.commit()
+            db_session.refresh(db_user)
 
-
-@auth_users_api_router.post("/users/{user_id}/generate-token")
-async def generate_token_api(
-    user_id: int, auth_context: AuthContext = Depends(verify_admin_auth_token)
-):
-    """Generate a new token for a user."""
-    try:
-        auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=True)
-
-        user = next((u for u in users if u.id == user_id), None)
-        if not user:
-            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
-
-        if not user.is_active:
-            raise HTTPException(
-                status_code=HTTP_400_BAD_REQUEST,
-                detail="Cannot generate token for inactive user",
+            logger.info(
+                f"Created new auth user via API: {user_request.email} "
+                f"(account: {user_request.account_id})"
             )
 
-        new_token = await auth_service.generate_user_token(user.email, send_email=True)
-        logger.info(f"Generated new token via API for user: {user.email}")
-
-        return {
-            "message": "Token generated successfully and emailed to user",
-            "user_email": user.email,
-            "token": new_token,
-            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
-        }
+            return UserResponse(
+                auth_user_id=str(db_user.auth_user_id),
+                email=db_user.email,
+                username=db_user.username,
+                is_admin=db_user.is_admin,
+                is_active=db_user.is_active,
+                account_id=str(db_user.account_id) if db_user.account_id else None,
+                created_at=db_user.created_at,
+                updated_at=db_user.updated_at,
+            )
 
     except HTTPException:
         raise
-    except MultiUserAuthError as e:
-        logger.error(f"Failed to generate token via API for user {user_id}: {e}")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error generating token via API for user {user_id}: {e}")
+        logger.error(f"Unexpected error creating user via API: {e}")
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST, detail="Failed to generate token"
+            status_code=HTTP_400_BAD_REQUEST, detail=f"Failed to create user: {str(e)}"
+        )
+
+
+@auth_users_api_router.patch("/users/{user_id}/status")
+async def toggle_user_status_api(
+    user_id: str,
+    is_active: bool,
+    current_user: TokenPayload = Depends(require_admin),
+):
+    """Activate or deactivate a user."""
+    try:
+        with get_session(DB_ENGINE) as db_session:
+            user = db_session.get(AuthUserTable, user_id)
+
+            if not user:
+                raise HTTPException(
+                    status_code=HTTP_404_NOT_FOUND, detail="User not found"
+                )
+
+            user.is_active = is_active
+            user.updated_at = datetime.now(UTC)
+            db_session.commit()
+
+            status = "activated" if is_active else "deactivated"
+            logger.info(f"{status.capitalize()} user via API: {user.email}")
+
+            return {
+                "message": f"User {status} successfully",
+                "user_email": user.email,
+                "is_active": user.is_active,
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating user {user_id} status via API: {e}")
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST, detail="Failed to update user status"
         )
 
 
 @auth_users_api_router.delete("/users/{user_id}")
 async def deactivate_user_api(
-    user_id: int, auth_context: AuthContext = Depends(verify_admin_auth_token)
+    user_id: str,
+    current_user: TokenPayload = Depends(require_admin),
 ):
-    """Deactivate a user."""
-    try:
-        auth_service = get_multi_user_auth_service()
-        users = auth_service.list_users(include_inactive=True)
-
-        user = next((u for u in users if u.id == user_id), None)
-        if not user:
-            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
-
-        success = auth_service.deactivate_user(user.email)
-        if success:
-            logger.info(f"Deactivated user via API: {user.email}")
-            return {"message": "User deactivated successfully", "user_email": user.email}
-        else:
-            raise HTTPException(
-                status_code=HTTP_400_BAD_REQUEST, detail="Failed to deactivate user"
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deactivating user {user_id} via API: {e}")
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST, detail="Failed to deactivate user"
-        )
-
-
-@auth_users_api_router.post("/maintenance/clean-expired-tokens")
-async def clean_expired_tokens_api(
-    auth_context: AuthContext = Depends(verify_admin_auth_token),
-):
-    """Clean up expired tokens from all users."""
-    try:
-        auth_service = get_multi_user_auth_service()
-        cleaned_count = auth_service.clean_expired_tokens()
-
-        logger.info(f"Cleaned {cleaned_count} expired tokens via API")
-        return {"message": "Token cleanup completed", "tokens_cleaned": cleaned_count}
-
-    except Exception as e:
-        logger.error(f"Error cleaning expired tokens via API: {e}")
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST, detail="Failed to clean expired tokens"
-        )
+    """Deactivate a user (convenience endpoint)."""
+    return await toggle_user_status_api(
+        user_id, is_active=False, current_user=current_user
+    )

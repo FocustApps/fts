@@ -14,13 +14,19 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 
+# Disable rate limiting for tests BEFORE importing app modules
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
 # Load environment variables for database connection
 load_dotenv()
 
 from common.service_connections.db_service.db_manager import DB_ENGINE
 
 # Import database model fixtures
-pytest_plugins = ["tests.fixtures.db_model_fixtures"]
+pytest_plugins = [
+    "tests.fixtures.db_model_fixtures",
+    "tests.fixtures.composite_fixtures",  # Domain-based composite fixtures
+]
 
 
 @pytest.fixture(scope="session")
@@ -90,19 +96,39 @@ def mock_logger():
         yield mock_log
 
 
-@pytest.fixture(autouse=True)
-def cleanup_auth_service():
-    """Automatically cleanup auth service after each test."""
-    yield
+@pytest.fixture(scope="function")
+def mailhog():
+    """
+    Provide MailHog test helper for email testing.
 
-    # Cleanup global auth service if it exists
+    Automatically clears emails before each test.
+    Only works when USE_MAILHOG=true environment variable is set.
+    """
     try:
-        from app.services.auth_service import shutdown_auth_service
+        from tests.fixtures.mailhog_helper import MailHogTestHelper
 
-        shutdown_auth_service()
-    except (RuntimeError, ImportError):
-        # Service not initialized or module not available
-        pass
+        helper = MailHogTestHelper()
+        helper.clear_all_emails()  # Clean slate for each test
+        yield helper
+    except RuntimeError as e:
+        pytest.skip(f"MailHog not available: {e}")
+
+
+@pytest.fixture(scope="session")
+def mailhog_available():
+    """
+    Check if MailHog is available for testing.
+
+    Returns:
+        bool: True if MailHog is configured and reachable
+    """
+    try:
+        from tests.fixtures.mailhog_helper import MailHogTestHelper
+
+        helper = MailHogTestHelper()
+        return helper.mailhog.is_available()
+    except Exception:
+        return False
 
 
 def pytest_configure(config):

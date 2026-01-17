@@ -8,12 +8,15 @@ This module provides:
 4. Polymorphic query helpers for tag-based entity filtering
 """
 
+from __future__ import annotations
+
 import logging
 import threading
 import traceback
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
+from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import and_, func, select
 from sqlalchemy.engine import Engine
@@ -21,9 +24,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 from common.service_connections.db_service.database.tables.entity_tag import (
     EntityTagTable,
 )
+
+if TYPE_CHECKING:
+    from app.models.auth_models import TokenPayload
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +214,7 @@ class EntityTagModel(BaseModel):
     deactivated_at: Optional[datetime] = None
     deactivated_by_user_id: Optional[str] = None
     created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     @field_validator("entity_type")
     def validate_entity_type(cls, v: str) -> str:
@@ -275,7 +285,7 @@ class EntityTagModel(BaseModel):
 # ============================================================================
 
 
-def insert_entity_tag(model: EntityTagModel, engine: Engine, session: Session) -> str:
+def insert_entity_tag(model: EntityTagModel, engine: Engine) -> str:
     """Insert new entity tag record.
 
     Args:
@@ -291,7 +301,7 @@ def insert_entity_tag(model: EntityTagModel, engine: Engine, session: Session) -
     """
     tag_dict = model.model_dump(exclude_unset=True)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         new_tag = EntityTagTable(**tag_dict)
         db_session.add(new_tag)
         db_session.commit()
@@ -299,43 +309,39 @@ def insert_entity_tag(model: EntityTagModel, engine: Engine, session: Session) -
 
 
 def query_entity_tag_by_id(
-    tag_id: str, session: Session, engine: Engine
+    tag_id: str, db_session: Session, engine: Engine
 ) -> Optional[EntityTagModel]:
     """Query entity tag by tag_id.
 
     Args:
         tag_id: Tag ID to query
-        session: Active database session
+        db_session: Active database session
         engine: Database engine
 
     Returns:
         EntityTagModel if found, None otherwise
     """
-    with session() as db_session:
-        tag = db_session.get(EntityTagTable, tag_id)
-        if tag:
-            return EntityTagModel(**tag.__dict__)
-        return None
+    tag = db_session.get(EntityTagTable, tag_id)
+    if tag:
+        return EntityTagModel(**tag.__dict__)
+    return None
 
 
-def query_all_entity_tags(session: Session, engine: Engine) -> List[EntityTagModel]:
+def query_all_entity_tags(db_session: Session, engine: Engine) -> List[EntityTagModel]:
     """Query all entity tags (filtered by RLS if active).
 
     Args:
-        session: Active database session
+        db_session: Active database session
         engine: Database engine
 
     Returns:
         List of EntityTagModel instances
     """
-    with session() as db_session:
-        tags = db_session.query(EntityTagTable).all()
-        return [EntityTagModel(**tag.__dict__) for tag in tags]
+    tags = db_session.query(EntityTagTable).all()
+    return [EntityTagModel(**tag.__dict__) for tag in tags]
 
 
-def update_entity_tag(
-    tag_id: str, updates: EntityTagModel, engine: Engine, session: Session
-) -> bool:
+def update_entity_tag(tag_id: str, updates: EntityTagModel, engine: Engine) -> bool:
     """Update entity tag record.
 
     Args:
@@ -352,7 +358,7 @@ def update_entity_tag(
     """
     update_dict = updates.model_dump(exclude_unset=True)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -364,7 +370,7 @@ def update_entity_tag(
         return True
 
 
-def drop_entity_tag(tag_id: str, engine: Engine, session: Session) -> bool:
+def drop_entity_tag(tag_id: str, engine: Engine, db_session: Session) -> bool:
     """Permanently delete entity tag record.
 
     Args:
@@ -374,7 +380,7 @@ def drop_entity_tag(tag_id: str, engine: Engine, session: Session) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -385,7 +391,7 @@ def drop_entity_tag(tag_id: str, engine: Engine, session: Session) -> bool:
 
 
 def deactivate_entity_tag(
-    tag_id: str, deactivated_by_user_id: str, engine: Engine, session: Session
+    tag_id: str, deactivated_by_user_id: str, engine: Engine
 ) -> bool:
     """Soft delete entity tag by setting is_active=False.
 
@@ -397,7 +403,7 @@ def deactivate_entity_tag(
     Returns:
         True if deactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -410,7 +416,7 @@ def deactivate_entity_tag(
         return True
 
 
-def reactivate_entity_tag(tag_id: str, engine: Engine, session: Session) -> bool:
+def reactivate_entity_tag(tag_id: str, engine: Engine, db_session: Session) -> bool:
     """Reactivate soft-deleted entity tag.
 
     Args:
@@ -420,7 +426,7 @@ def reactivate_entity_tag(tag_id: str, engine: Engine, session: Session) -> bool
     Returns:
         True if reactivated, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         tag = db_session.get(EntityTagTable, tag_id)
         if not tag:
             return False
@@ -442,24 +448,36 @@ def query_tags_for_entity(
     entity_type: str,
     entity_id: str,
     account_id: str,
-    session: Session,
+    token: TokenPayload,
+    db_session: Session,
     engine: Engine,
     active_only: bool = True,
 ) -> List[EntityTagModel]:
-    """Query all tags for a specific entity.
+    """Query all tags for a specific entity with account access validation.
 
     Args:
         entity_type: Type of entity (suite, test_case, etc.)
         entity_id: Entity's primary key
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         active_only: If True, only return active tags
 
     Returns:
         List of EntityTagModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
-    with session() as db_session:
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query tags for a different account",
+        )
+
+    with session(engine) as db_session:
         query = db_session.query(EntityTagTable).filter(
             and_(
                 EntityTagTable.entity_type == entity_type,
@@ -479,52 +497,65 @@ def query_entities_by_tag(
     tag_name: str,
     entity_type: str,
     account_id: str,
-    session: Session,
+    token: TokenPayload,
+    db_session: Session,
     engine: Engine,
     active_only: bool = True,
 ) -> List[str]:
-    """Query entity IDs that have a specific tag.
+    """Query entity IDs that have a specific tag with account access validation.
 
     Args:
         tag_name: Tag name to search for
         entity_type: Type of entity to filter (suite, test_case, etc.)
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         active_only: If True, only return tags on active entities
 
     Returns:
         List of entity_id strings
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
-    with session() as db_session:
-        query = db_session.query(EntityTagTable.entity_id).filter(
-            and_(
-                EntityTagTable.tag_name == tag_name,
-                EntityTagTable.entity_type == entity_type,
-                EntityTagTable.account_id == account_id,
-            )
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query entities for a different account",
         )
 
-        if active_only:
-            query = query.filter(EntityTagTable.is_active == True)
+    query = db_session.query(EntityTagTable.entity_id).filter(
+        and_(
+            EntityTagTable.tag_name == tag_name,
+            EntityTagTable.entity_type == entity_type,
+            EntityTagTable.account_id == account_id,
+        )
+    )
 
-        results = query.all()
-        return [row[0] for row in results]
+    if active_only:
+        query = query.filter(EntityTagTable.is_active == True)
+
+    results = query.all()
+    return [row[0] for row in results]
 
 
 def query_tags_by_category(
     tag_category: str,
     account_id: str,
-    session: Session,
+    token: TokenPayload,
+    db_session: Session,
     engine: Engine,
     entity_type: Optional[str] = None,
     active_only: bool = True,
 ) -> List[EntityTagModel]:
-    """Query all tags in a specific category.
+    """Query all tags in a specific category with account access validation.
 
     Args:
         tag_category: Tag category to filter by
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         entity_type: Optional entity type filter
@@ -532,51 +563,72 @@ def query_tags_by_category(
 
     Returns:
         List of EntityTagModel instances
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
-    with session() as db_session:
-        filters = [
-            EntityTagTable.tag_category == tag_category,
-            EntityTagTable.account_id == account_id,
-        ]
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query tags for a different account",
+        )
 
-        if entity_type:
-            filters.append(EntityTagTable.entity_type == entity_type)
+    filters = [
+        EntityTagTable.tag_category == tag_category,
+        EntityTagTable.account_id == account_id,
+    ]
 
-        if active_only:
-            filters.append(EntityTagTable.is_active == True)
+    if entity_type:
+        filters.append(EntityTagTable.entity_type == entity_type)
 
-        query = db_session.query(EntityTagTable).filter(and_(*filters))
+    if active_only:
+        filters.append(EntityTagTable.is_active == True)
 
-        tags = query.all()
-        return [EntityTagModel(**tag.__dict__) for tag in tags]
+    query = db_session.query(EntityTagTable).filter(and_(*filters))
+
+    tags = query.all()
+    return [EntityTagModel(**tag.__dict__) for tag in tags]
 
 
 def query_unique_tag_names(
-    account_id: str, session: Session, engine: Engine, entity_type: Optional[str] = None
+    account_id: str,
+    token: TokenPayload,
+    db_session: Session,
+    engine: Engine,
+    entity_type: Optional[str] = None,
 ) -> List[str]:
-    """Query unique tag names for autocomplete/dropdown.
+    """Query unique tag names for autocomplete/dropdown with account access validation.
 
     Args:
         account_id: Account ID for multi-tenant filtering
+        token: JWT token payload for authorization
         session: Active database session
         engine: Database engine
         entity_type: Optional entity type filter
 
     Returns:
         Sorted list of unique tag names
+
+    Raises:
+        HTTPException: 403 if user attempts to access another account's data
     """
-    with session() as db_session:
-        filters = [EntityTagTable.account_id == account_id]
-
-        if entity_type:
-            filters.append(EntityTagTable.entity_type == entity_type)
-
-        query = (
-            db_session.query(EntityTagTable.tag_name).filter(and_(*filters)).distinct()
+    # Validate account access (defense-in-depth)
+    if not token.is_super_admin and token.account_id != account_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Cannot query tags for a different account",
         )
 
-        results = query.all()
-        return sorted([row[0] for row in results])
+    filters = [EntityTagTable.account_id == account_id]
+
+    if entity_type:
+        filters.append(EntityTagTable.entity_type == entity_type)
+
+    query = db_session.query(EntityTagTable.tag_name).filter(and_(*filters)).distinct()
+
+    results = query.all()
+    return sorted([row[0] for row in results])
 
 
 # ============================================================================
@@ -592,7 +644,6 @@ def add_tags_to_entity(
     account_id: str,
     created_by_user_id: str,
     engine: Engine,
-    session: Session,
     tag_values: Optional[Dict[str, str]] = None,
 ) -> List[str]:
     """Add multiple tags to an entity in a single transaction.
@@ -618,7 +669,7 @@ def add_tags_to_entity(
     tag_ids = []
     tag_values = tag_values or {}
 
-    with session() as db_session:
+    with session(engine) as db_session:
         for tag_name in tag_names:
             tag_model = EntityTagModel(
                 entity_type=entity_type,
@@ -647,7 +698,6 @@ def replace_entity_tags(
     created_by_user_id: str,
     deactivated_by_user_id: str,
     engine: Engine,
-    session: Session,
     tag_values: Optional[Dict[str, str]] = None,
 ) -> Dict[str, List[str]]:
     """Replace all tags for an entity (deactivate old, add new).
@@ -673,7 +723,7 @@ def replace_entity_tags(
     result = {"deactivated": [], "created": []}
     tag_values = tag_values or {}
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Deactivate existing tags
         existing_tags = (
             db_session.query(EntityTagTable)

@@ -2,41 +2,57 @@
 Fenrir Fast API application
 """
 
+# Import python_multipart to prevent deprecation warning from Starlette
+
 from fastapi import FastAPI, Request
-from pathlib import Path
+from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
-from app import TEMPLATE_PATH
 from app.routes import API_ROUTERS
 from app.utils import get_project_root
-from app.tasks.token_rotation import auth_scheduler_lifespan
+from app.middleware.https_middleware import HTTPSEnforcementMiddleware
 from common.app_logging import create_logging
 
 from app.config import get_base_app_config
 
-from app.routes.auth import get_auth_token_from_cookie
-from app.dependencies.multi_user_auth_dependency import verify_multi_user_auth_token
-from fastapi.responses import RedirectResponse
 
 BASE_CONFIG = get_base_app_config()
 
 logging = create_logging()
 
 
-def get_template_folder() -> Path:
-    return Path(TEMPLATE_PATH)
-
-
 app = FastAPI(
     title="FocustApps Fenrir Test Automation",
     description="Fenrir is a test automation tool for web applications.",
     version="0.1",
-    lifespan=auth_scheduler_lifespan,
 )
+
+# Add CORS middleware
+if BASE_CONFIG.cors_allow_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=BASE_CONFIG.cors_allow_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    logging.info(f"CORS enabled for origins: {BASE_CONFIG.cors_allow_origins}")
+
+# Add HTTPS enforcement middleware
+if BASE_CONFIG.enforce_https:
+    app.add_middleware(HTTPSEnforcementMiddleware, enforce=True)
+    logging.info("HTTPS enforcement enabled")
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # Middleware to handle proxy headers from Caddy
@@ -60,13 +76,15 @@ app.mount(
     app=StaticFiles(directory=f"{get_project_root()}/app/static/"),
     name="static",
 )
-templates = Jinja2Templates(directory=f"{get_template_folder()}")
 
 for router in API_ROUTERS:
     logging.debug(f"Adding router: {router.prefix}")
-    # Auth view routes should be at root level (no API version prefix)
-    if (router.prefix == "/auth" and "auth-views" in router.tags) or (
-        router.prefix == "/auth-users" and "auth-users-views" in router.tags
+    # Auth routes should be at root level (no API version prefix)
+    # This includes both view routes and API auth routes
+    if (
+        (router.prefix == "/auth" and "auth-views" in router.tags)
+        or (router.prefix == "/auth-users" and "auth-users-views" in router.tags)
+        or (router.prefix == "/api/auth")  # Auth API routes remain unversioned
     ):
         app.include_router(router)
     else:
@@ -84,47 +102,11 @@ async def health_check():
 
 @app.get("/", response_class=HTMLResponse)
 async def root_page(request: Request):
+    """
+    Root page - serves main application.
 
-    # Check if user is authenticated via cookie
-    auth_token = get_auth_token_from_cookie(request)
-    if not auth_token:
-        # Redirect to login page if not authenticated
-        return RedirectResponse(url="/auth/login", status_code=302)
+    Authentication is handled client-side via JavaScript.
+    The page will redirect to login if no valid JWT token is found.
+    """
 
-    # Get current user context for navbar
-    current_user = None
-    try:
-        auth_context = await verify_multi_user_auth_token(request)
-        current_user = {
-            "username": auth_context.username
-            or (
-                auth_context.user_email.split("@")[0]
-                if auth_context.user_email
-                else "User"
-            ),
-            "email": auth_context.user_email,
-            "is_admin": auth_context.is_admin,
-        }
-    except Exception as e:
-        logging.warning(f"Failed to get user context: {e}")
-        # For legacy tokens or errors, create minimal user context
-        current_user = {"username": "User", "email": None, "is_admin": False}
-
-    navigation_routes = {
-        "Environments": "get_environments",
-        "Users": "get_users",
-        "Pages": "get_pages",
-        "Identifiers": "get_identifiers_view",
-        "Actions": "get_actions_view",
-        "Email Processing Items": "get_email_processing_items",
-        "Auth Users": "get_auth_users_view",
-    }
-
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "navigation": navigation_routes,
-            "current_user": current_user,
-        },
-    )
+    return

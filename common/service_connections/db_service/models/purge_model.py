@@ -16,6 +16,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from common.config import should_validate_write
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
 
 from common.service_connections.db_service.database.tables.purge_table import (
     PurgeTable,
@@ -69,13 +72,12 @@ class PurgeModel(BaseModel):
 # ============================================================================
 
 
-def insert_purge_schedule(model: PurgeModel, engine: Engine, session: Session) -> str:
+def insert_purge_schedule(model: PurgeModel, engine: Engine) -> str:
     """Insert new purge schedule (admin only).
 
     Args:
         model: PurgeModel with schedule configuration
         engine: Database engine
-        session: Active database session
 
     Returns:
         purge_id of inserted record
@@ -86,7 +88,7 @@ def insert_purge_schedule(model: PurgeModel, engine: Engine, session: Session) -
     """
     purge_dict = model.model_dump(exclude_unset=True)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         # Check if schedule already exists for this table
         existing = (
             db_session.query(PurgeTable)
@@ -107,7 +109,7 @@ def insert_purge_schedule(model: PurgeModel, engine: Engine, session: Session) -
 
 
 def query_purge_schedule_by_id(
-    purge_id: str, session: Session, engine: Engine
+    purge_id: str, db_session: Session, engine: Engine
 ) -> Optional[PurgeModel]:
     """Query purge schedule by purge_id.
 
@@ -119,31 +121,18 @@ def query_purge_schedule_by_id(
     Returns:
         PurgeModel if found, None otherwise
     """
-    with session() as db_session:
-        purge = db_session.get(PurgeTable, purge_id)
-        if purge:
-            return PurgeModel(**purge.__dict__)
-        return None
+    purge = db_session.get(PurgeTable, purge_id)
+    if purge:
+        return PurgeModel(**purge.__dict__)
+    return None
 
 
-def query_all_purge_schedules(session: Session, engine: Engine) -> List[PurgeModel]:
-    """Query all purge schedules.
-
-    Args:
-        session: Active database session
-        engine: Database engine
-
-    Returns:
-        List of PurgeModel instances
-    """
-    with session() as db_session:
-        purges = db_session.query(PurgeTable).all()
-        return [PurgeModel(**purge.__dict__) for purge in purges]
+def query_all_purge_schedules(db_session: Session, engine: Engine) -> List[PurgeModel]:
+    purges = db_session.query(PurgeTable).all()
+    return [PurgeModel(**purge.__dict__) for purge in purges]
 
 
-def update_purge_schedule(
-    purge_id: str, updates: PurgeModel, engine: Engine, session: Session
-) -> bool:
+def update_purge_schedule(purge_id: str, updates: PurgeModel, engine: Engine) -> bool:
     """Update purge schedule (admin only).
 
     Args:
@@ -163,7 +152,7 @@ def update_purge_schedule(
     # Add updated_at timestamp
     update_dict["updated_at"] = datetime.now(timezone.utc)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = db_session.get(PurgeTable, purge_id)
         if not purge:
             return False
@@ -175,7 +164,7 @@ def update_purge_schedule(
         return True
 
 
-def drop_purge_schedule(purge_id: str, engine: Engine, session: Session) -> bool:
+def drop_purge_schedule(purge_id: str, engine: Engine) -> bool:
     """Permanently delete purge schedule (admin only).
 
     WARNING: Deleting a purge schedule disables automated cleanup for the table.
@@ -188,7 +177,7 @@ def drop_purge_schedule(purge_id: str, engine: Engine, session: Session) -> bool
     Returns:
         True if deleted, False if not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = db_session.get(PurgeTable, purge_id)
         if not purge:
             return False
@@ -204,7 +193,7 @@ def drop_purge_schedule(purge_id: str, engine: Engine, session: Session) -> bool
 
 
 def query_purge_schedule_by_table(
-    table_name: str, session: Session, engine: Engine
+    table_name: str, db_session: Session, engine: Engine
 ) -> Optional[PurgeModel]:
     """Query purge schedule for a specific table.
 
@@ -216,49 +205,33 @@ def query_purge_schedule_by_table(
     Returns:
         PurgeModel if found, None otherwise
     """
-    with session() as db_session:
-        purge = (
-            db_session.query(PurgeTable)
-            .filter(PurgeTable.table_name == table_name)
-            .first()
-        )
+    purge = (
+        db_session.query(PurgeTable).filter(PurgeTable.table_name == table_name).first()
+    )
 
-        if purge:
-            return PurgeModel(**purge.__dict__)
-        return None
+    if purge:
+        return PurgeModel(**purge.__dict__)
+    return None
 
 
-def query_tables_due_for_purge(session: Session, engine: Engine) -> List[PurgeModel]:
-    """Query tables that are due for purge based on interval.
+def query_tables_due_for_purge(db_session: Session, engine: Engine) -> List[PurgeModel]:
+    current_time = datetime.now(timezone.utc)
 
-    Calculates next purge date as: last_purged_at + purge_interval_days
-    Returns tables where current time >= next_purge_date
+    purges = db_session.query(PurgeTable).all()
 
-    Args:
-        session: Active database session
-        engine: Database engine
+    due_purges = []
+    for purge in purges:
+        # PostgreSQL returns timezone-naive datetime, make it aware for comparison
+        last_purged = purge.last_purged_at.replace(tzinfo=timezone.utc)
+        next_purge_date = last_purged + timedelta(days=purge.purge_interval_days)
+        if current_time >= next_purge_date:
+            due_purges.append(PurgeModel(**purge.__dict__))
 
-    Returns:
-        List of PurgeModel instances for tables needing purge
-    """
-    with session() as db_session:
-        current_time = datetime.now(timezone.utc)
-
-        purges = db_session.query(PurgeTable).all()
-
-        due_purges = []
-        for purge in purges:
-            next_purge_date = purge.last_purged_at + timedelta(
-                days=purge.purge_interval_days
-            )
-            if current_time >= next_purge_date:
-                due_purges.append(PurgeModel(**purge.__dict__))
-
-        return due_purges
+    return due_purges
 
 
 def update_last_purged_at(
-    purge_id: str, purged_at: Optional[datetime], engine: Engine, session: Session
+    purge_id: str, purged_at: Optional[datetime], engine: Engine
 ) -> bool:
     """Update last_purged_at timestamp after successful purge (called by background jobs).
 
@@ -266,7 +239,6 @@ def update_last_purged_at(
         purge_id: Purge schedule ID to update
         purged_at: Timestamp of purge completion (defaults to now)
         engine: Database engine
-        session: Active database session
 
     Returns:
         True if updated, False if not found
@@ -277,7 +249,7 @@ def update_last_purged_at(
     if purged_at is None:
         purged_at = datetime.now(timezone.utc)
 
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = db_session.get(PurgeTable, purge_id)
         if not purge:
             return False
@@ -290,7 +262,7 @@ def update_last_purged_at(
 
 
 def update_purge_interval(
-    table_name: str, new_interval_days: int, engine: Engine, session: Session
+    table_name: str, new_interval_days: int, engine: Engine
 ) -> bool:
     """Update purge interval for a table (admin shortcut).
 
@@ -298,8 +270,7 @@ def update_purge_interval(
         table_name: Table name to update interval for
         new_interval_days: New purge interval in days
         engine: Database engine
-        session: Active database session
-        
+
     Returns:
         True if updated, False if schedule not found
 
@@ -311,7 +282,7 @@ def update_purge_interval(
             f"Invalid purge interval {new_interval_days}. Must be 1-3650 days."
         )
 
-    with session() as db_session:
+    with session(engine) as db_session:
         purge = (
             db_session.query(PurgeTable)
             .filter(PurgeTable.table_name == table_name)
@@ -328,38 +299,28 @@ def update_purge_interval(
         return True
 
 
-def get_purge_schedule_summary(session: Session, engine: Engine) -> List[dict]:
-    """Get summary of all purge schedules with next purge dates.
+def get_purge_schedule_summary(db_session: Session, engine: Engine) -> List[dict]:
+    purges = db_session.query(PurgeTable).all()
+    current_time = datetime.now(timezone.utc)
 
-    Args:
-        session: Active database session
-        engine: Database engine
+    summary = []
+    for purge in purges:
+        # PostgreSQL returns timezone-naive datetime, make it aware for comparison
+        last_purged = purge.last_purged_at.replace(tzinfo=timezone.utc)
+        next_purge_date = last_purged + timedelta(days=purge.purge_interval_days)
+        is_due = current_time >= next_purge_date
 
-    Returns:
-        List of dicts with table_name, last_purged_at, interval, next_purge_date
-    """
-    with session() as db_session:
-        purges = db_session.query(PurgeTable).all()
-        current_time = datetime.now(timezone.utc)
+        summary.append(
+            {
+                "table_name": purge.table_name,
+                "last_purged_at": purge.last_purged_at,
+                "purge_interval_days": purge.purge_interval_days,
+                "next_purge_date": next_purge_date,
+                "is_due_for_purge": is_due,
+            }
+        )
 
-        summary = []
-        for purge in purges:
-            next_purge_date = purge.last_purged_at + timedelta(
-                days=purge.purge_interval_days
-            )
-            is_due = current_time >= next_purge_date
+    # Sort by next_purge_date (soonest first)
+    summary.sort(key=lambda x: x["next_purge_date"])
 
-            summary.append(
-                {
-                    "table_name": purge.table_name,
-                    "last_purged_at": purge.last_purged_at,
-                    "purge_interval_days": purge.purge_interval_days,
-                    "next_purge_date": next_purge_date,
-                    "is_due_for_purge": is_due,
-                }
-            )
-
-        # Sort by next_purge_date (soonest first)
-        summary.sort(key=lambda x: x["next_purge_date"])
-
-        return summary
+    return summary

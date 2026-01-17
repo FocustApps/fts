@@ -9,57 +9,77 @@ from sqlalchemy.orm import Session
 # Import centralized database components
 from common.service_connections.db_service.database import (
     EnvironmentTable,
-    SystemUnderTestUserTable,
+    TestEnvUserAccountsTable,
 )
-from common.service_connections.db_service.models.user_model import UserModel
+from common.service_connections.db_service.database.engine import (
+    get_database_session as session,
+)
+from common.service_connections.db_service.models.account_models.user_model import (
+    UserModel,
+)
 
 
 class EnvironmentModel(BaseModel):
     """
     Schema for representing an environment.
+    Fields match EnvironmentTable database schema.
 
     Fields:
-    - name: str | None, the name of the environment.
-    - environment_designation: EnvironmentEnum | None, the designation of the environment.
-    - url: str | None, the URL of the environment.
-    - status: bool | None, the status of the environment.
-    - users: List[UserSchema] | None, the list of users associated with the environment.
-    - created_at: str | None, the creation date of the environment.
-    - updated_at: str | None, the update date of the environment.
+    - environment_id: str | None - UUID primary key
+    - environment_name: str | None - Unique environment name
+    - environment_designation: str | None - Environment designation (dev, qa, staging, prod)
+    - environment_base_url: str | None - Base URL for the environment
+    - api_base_url: str | None - API base URL
+    - environment_status: str | None - Environment status
+    - users_in_environment: List | None - JSONB list of users
+    - is_active: bool - Soft delete flag
+    - deactivated_at: datetime | None - Soft delete timestamp
+    - deactivated_by_user_id: str | None - Who deactivated
+    - created_at: datetime | None - Creation timestamp
+    - updated_at: datetime | None - Update timestamp
     """
 
-    id: int | None = None
-    name: str | None = None
+    environment_id: str | None = None
+    environment_name: str | None = None
     environment_designation: str | None = None
-    url: str | None = None
-    api_url: str | None = None
-    status: bool | None = None
+    environment_base_url: str | None = None
+    api_base_url: str | None = None
+    environment_status: str | None = None
+    users_in_environment: List | None = None
+    is_active: bool = True
+    deactivated_at: datetime | None = None
+    deactivated_by_user_id: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    users: List | None = None
 
 
 ############# Environment Queries #############
 
 
-def insert_environment(
-    environment: EnvironmentModel, session: Session, engine: Engine
-) -> EnvironmentModel:
+def insert_environment(environment: EnvironmentModel, engine: Engine) -> str:
     """
     Creates an environment in the database
     """
-    if environment.id:
-        environment.id = None
-        logging.error("Environment ID will only be set by the system")
-    if not environment.users:
-        environment.users = []
-    with session() as session:
+    import uuid
+
+    if environment.environment_id:
+        logging.warning(
+            "Environment ID provided will be replaced by system-generated UUID"
+        )
+
+    # Generate UUID for environment_id
+    environment.environment_id = str(uuid.uuid4())
+
+    if not environment.users_in_environment:
+        environment.users_in_environment = []
+
+    with session(engine) as db_session:
         environment.created_at = datetime.now()
         db_environment = EnvironmentTable(**environment.model_dump())
-        session.add(db_environment)
-        session.commit()
-        session.refresh(db_environment)
-    return EnvironmentModel(**db_environment.__dict__)
+        db_session.add(db_environment)
+        db_session.commit()
+        db_session.refresh(db_environment)
+    return db_environment.environment_id
 
 
 def query_environment_by_name(
@@ -68,121 +88,116 @@ def query_environment_by_name(
     """
     Retrieves an environment from the database by name
     """
-    with session() as session:
-        return (
-            session.query(EnvironmentTable).filter(EnvironmentTable.name == name).first()
-        )
+    return (
+        session.query(EnvironmentTable)
+        .filter(EnvironmentTable.environment_name == name)
+        .first()
+    )
 
 
 def query_environment_by_id(
-    environment_id: int, session: Session, engine: Engine
+    environment_id: str, session: Session, engine: Engine
 ) -> EnvironmentModel:
     """
     Retrieves an environment from the database by id
     """
-    with session() as session:
-        env = (
-            session.query(EnvironmentTable)
-            .filter(EnvironmentTable.id == environment_id)
-            .first()
-        )
-        if not env:
-            raise ValueError(f"Environment ID {environment_id} not found.")
-        if env.users:
-            try:
-                env.users = [
-                    UserModel(
-                        **session.query(SystemUnderTestUserTable)
-                        .filter(SystemUnderTestUserTable.sut_user_id == user[0])
-                        .first()
-                        .__dict__
-                    )
-                    for user in env.users
-                ]
-            except AttributeError:
-                env.users = []
+    env = (
+        session.query(EnvironmentTable)
+        .filter(EnvironmentTable.environment_id == environment_id)
+        .first()
+    )
+    if not env:
+        raise ValueError(f"Environment ID {environment_id} not found.")
+    if env.users_in_environment:
+        try:
+            env.users_in_environment = [
+                UserModel(
+                    **session.query(TestEnvUserAccountsTable)
+                    .filter(TestEnvUserAccountsTable.sut_user_id == user[0])
+                    .first()
+                    .__dict__
+                )
+                for user in env.users_in_environment
+            ]
+        except AttributeError:
+            env.users_in_environment = []
     return EnvironmentModel(**env.__dict__)
 
 
-def query_all_environments(session: Session, engine) -> List[EnvironmentModel]:
+def query_all_environments(session: Session, engine: Engine) -> List[EnvironmentModel]:
     """
     Retrieves all environments from the database
     """
-    with session() as session:
-        envs = session.query(EnvironmentTable).all()
-        return [EnvironmentModel(**env.__dict__) for env in envs if env.status]
+    envs = session.query(EnvironmentTable).all()
+    return [EnvironmentModel(**env.__dict__) for env in envs if env.environment_status]
 
 
 def update_environment_by_id(
-    environment_id: int,
+    environment_id: str,
     environment: EnvironmentModel,
-    session: Session,
     engine: Engine,
-) -> EnvironmentModel:
+) -> bool:
     """
     Updates an environment in the database
     """
-    with session() as session:
-        db_environment = session.get(EnvironmentTable, environment_id)
+    with session(engine) as db_session:
+        db_environment = db_session.get(EnvironmentTable, environment_id)
         if not db_environment:
             raise ValueError(f"Environment ID {environment_id} not found.")
         environment.updated_at = datetime.now()
         env_data = environment.model_dump(exclude_unset=True)
-        db_environment.users = db_environment.users or []
-        if env_data.get("users"):
-            env_data["users"] = [
-                f"{user["id"]}:{user["username"]}" for user in env_data["users"]
-            ] + db_environment.users
+        db_environment.users_in_environment = db_environment.users_in_environment or []
+        if env_data.get("users_in_environment"):
+            env_data["users_in_environment"] = [
+                f"{user["id"]}:{user["username"]}"
+                for user in env_data["users_in_environment"]
+            ] + db_environment.users_in_environment
         for key, value in env_data.items():
             setattr(db_environment, key, value)
-        session.commit()
-        session.refresh(db_environment)
-    return EnvironmentModel(**db_environment.__dict__)
+        db_session.commit()
+    return True
 
 
-def drop_environment_by_id(environment_id: int, session: Session, engine: Engine) -> int:
+def drop_environment_by_id(environment_id: str, engine: Engine) -> bool:
     """
     Deletes an environment in the database
     """
-    with session() as session:
-        environment = session.get(EnvironmentTable, environment_id)
-        session.delete(environment)
-        session.commit()
+    with session(engine) as db_session:
+        environment = db_session.get(EnvironmentTable, environment_id)
+        db_session.delete(environment)
+        db_session.commit()
         logging.info(f"Environment ID {environment_id} deleted.")
-    return 1
+    return True
 
 
-def deactivate_environment_by_id(
-    environment_id: int, session: Session, engine: Engine
-) -> EnvironmentModel:
+def deactivate_environment_by_id(environment_id: str, engine: Engine) -> bool:
     """
-    Soft delete an environment by setting status=False (deactivated).
+    Soft delete an environment by setting is_active=False (deactivated).
 
     Args:
         environment_id: Environment ID to deactivate
-        session: Database session context manager
         engine: Database engine
 
     Returns:
-        Updated EnvironmentModel with status=False
+        True if successful
 
     Raises:
         ValueError: If environment not found
     """
-    with session() as db_session:
+    with session(engine) as db_session:
         environment = db_session.get(EnvironmentTable, environment_id)
         if not environment:
             raise ValueError(f"Environment ID {environment_id} not found.")
 
-        environment.status = False
+        environment.is_active = False
+        environment.deactivated_at = datetime.now()
         environment.updated_at = datetime.now()
 
         db_session.commit()
-        db_session.refresh(environment)
 
-        logging.info(f"Environment ID {environment_id} deactivated (status=False).")
+        logging.info(f"Environment ID {environment_id} deactivated (is_active=False).")
 
-    return EnvironmentModel(**environment.__dict__)
+    return True
 
 
 def query_active_environments_by_account(
@@ -197,7 +212,7 @@ def query_active_environments_by_account(
 
     Args:
         account_id: Account ID to filter by
-        session: Database session context manager
+        session: Database session object
         engine: Database engine
 
     Returns:
@@ -205,24 +220,21 @@ def query_active_environments_by_account(
 
     TODO: Verify EnvironmentTable schema has account_id or proper relationship
     """
-    with session() as db_session:
-        # NOTE: This query assumes EnvironmentTable has account_id field
-        # If not present, this will need to join through SystemUnderTestTable
-        # or other linking table to filter by account
-        envs = (
-            db_session.query(EnvironmentTable)
-            .filter(EnvironmentTable.status == True)
-            .all()
-        )
+    # NOTE: This query assumes EnvironmentTable has account_id field
+    # If not present, this will need to join through SystemUnderTestTable
+    # or other linking table to filter by account
+    envs = (
+        session.query(EnvironmentTable).filter(EnvironmentTable.is_active == True).all()
+    )
 
-        # TODO: Add account filtering when schema relationship is confirmed
-        # .filter(EnvironmentTable.account_id == account_id)
+    # TODO: Add account filtering when schema relationship is confirmed
+    # .filter(EnvironmentTable.account_id == account_id)
 
-        return [EnvironmentModel(**env.__dict__) for env in envs]
+    return [EnvironmentModel(**env.__dict__) for env in envs]
 
 
 def query_environment_systems(
-    environment_id: int, session: Session, engine: Engine
+    environment_id: str, session: Session, engine: Engine
 ) -> List[dict]:
     """
     Query all systems under test associated with an environment.
@@ -232,7 +244,7 @@ def query_environment_systems(
 
     Args:
         environment_id: Environment ID to query systems for
-        session: Database session context manager
+        session: Database session object
         engine: Database engine
 
     Returns:
@@ -240,37 +252,36 @@ def query_environment_systems(
 
     TODO: Verify actual relationship between Environment and SystemUnderTest tables
     """
-    with session() as db_session:
-        # Verify environment exists
-        environment = db_session.get(EnvironmentTable, environment_id)
-        if not environment:
-            raise ValueError(f"Environment ID {environment_id} not found.")
+    # Verify environment exists
+    environment = session.get(EnvironmentTable, environment_id)
+    if not environment:
+        raise ValueError(f"Environment ID {environment_id} not found.")
 
-        # TODO: Implement actual query once schema relationship is confirmed
-        # This is a placeholder that needs the proper join through
-        # SystemUnderTestTable or association table
+    # TODO: Implement actual query once schema relationship is confirmed
+    # This is a placeholder that needs the proper join through
+    # SystemUnderTestTable or association table
 
-        # Example query structure (adjust based on actual schema):
-        # from common.service_connections.db_service.database import SystemUnderTestTable
-        #
-        # systems = (
-        #     db_session.query(SystemUnderTestTable)
-        #     .filter(SystemUnderTestTable.environment_id == environment_id)
-        #     .all()
-        # )
-        #
-        # return [
-        #     {
-        #         'sut_id': system.sut_id,
-        #         'sut_name': system.sut_name,
-        #         'account_id': system.account_id
-        #     }
-        #     for system in systems
-        # ]
+    # Example query structure (adjust based on actual schema):
+    # from common.service_connections.db_service.database import SystemUnderTestTable
+    #
+    # systems = (
+    #     session.query(SystemUnderTestTable)
+    #     .filter(SystemUnderTestTable.environment_id == environment_id)
+    #     .all()
+    # )
+    #
+    # return [
+    #     {
+    #         'sut_id': system.sut_id,
+    #         'sut_name': system.sut_name,
+    #         'account_id': system.account_id
+    #     }
+    #     for system in systems
+    # ]
 
-        logging.warning(
-            f"query_environment_systems() not fully implemented. "
-            f"Schema relationship between Environment and SystemUnderTest needs verification."
-        )
+    logging.warning(
+        f"query_environment_systems() not fully implemented. "
+        f"Schema relationship between Environment and SystemUnderTest needs verification."
+    )
 
-        return []
+    return []

@@ -1,0 +1,137 @@
+"""
+Example tests demonstrating MailHog email testing.
+
+These tests show how to use the mailhog fixture for email validation.
+"""
+
+import pytest
+from tests.fixtures.mailhog_helper import MailHogTestHelper
+from app.services.email_service import send_multiuser_token_notification
+
+
+class TestMailHogIntegration:
+    """Example tests using MailHog for email validation."""
+
+    def test_mailhog_is_available(self, mailhog: MailHogTestHelper):
+        """Test that MailHog service is available."""
+        assert mailhog.mailhog.is_available(), "MailHog should be available"
+
+    def test_mailbox_starts_empty(self, mailhog: MailHogTestHelper):
+        """Test that mailbox is cleared before each test."""
+        emails = mailhog.get_all_emails()
+        assert len(emails) == 0, "Mailbox should be empty at test start"
+
+    def test_send_simple_email(self, mailhog: MailHogTestHelper):
+        """Test sending a simple email via MailHog."""
+        # Send email using email service
+        mailhog.mailhog.send_email(
+            to_email="test@example.com",
+            subject="Test Email",
+            body="This is a test email body.",
+        )
+
+        # Wait for and verify email
+        message = mailhog.wait_for_email(to_email="test@example.com", timeout=5)
+
+        assert message is not None, "Email should be received"
+
+        # Verify content
+        body = mailhog.get_email_body(message)
+        assert "This is a test email body" in body
+
+    def test_search_multiple_emails(self, mailhog: MailHogTestHelper):
+        """Test searching for emails with different criteria."""
+        # Send multiple emails
+        for i in range(3):
+            mailhog.mailhog.send_email(
+                to_email=f"user{i}@test.com",
+                subject=f"Email {i}",
+                body=f"Body for email {i}",
+            )
+
+        # Get all emails
+        all_emails = mailhog.get_all_emails()
+        assert len(all_emails) == 3
+
+        # Search by specific recipient
+        user1_emails = mailhog.search_emails(to_email="user1@test.com")
+        assert len(user1_emails) == 1
+
+        # Get latest email
+        latest = mailhog.get_latest_email()
+        assert latest is not None
+
+    def test_token_extraction_from_email_body(self, mailhog: MailHogTestHelper):
+        """Test extracting authentication token from email."""
+        test_token = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+
+        # Send token email
+        send_multiuser_token_notification(
+            user_email="tokentest@test.com", token=test_token, is_new_user=False
+        )
+
+        # Wait for email
+        message = mailhog.wait_for_email(
+            to_email="tokentest@test.com", subject="Token", timeout=5
+        )
+
+        assert message is not None
+
+        # Extract token
+        extracted_token = mailhog.extract_token_from_email(message)
+        assert extracted_token == test_token
+
+    def test_assert_email_sent_with_timeout(self, mailhog: MailHogTestHelper):
+        """Test assertion with timeout for async email sending."""
+        # Send email (simulating async operation)
+        mailhog.mailhog.send_email(
+            to_email="async@test.com",
+            subject="Async Test",
+            body="Testing async email delivery",
+        )
+
+        # Assert with timeout (should succeed immediately)
+        message = mailhog.assert_email_sent(
+            to_email="async@test.com", subject="Async", timeout=10
+        )
+
+        assert message is not None
+
+    def test_email_not_found_raises_assertion_error(self, mailhog: MailHogTestHelper):
+        """Test that assertion fails when email not found."""
+        with pytest.raises(AssertionError, match="Email not found"):
+            mailhog.assert_email_sent(
+                to_email="nonexistent@test.com", timeout=2  # Short timeout for test speed
+            )
+
+    def test_welcome_email_vs_token_refresh(self, mailhog: MailHogTestHelper):
+        """Test difference between welcome email and token refresh."""
+        # Send welcome email
+        send_multiuser_token_notification(
+            user_email="welcome@test.com",
+            token="token123" + "0" * 57,
+            username="Welcome User",
+            is_new_user=True,
+        )
+
+        # Send token refresh
+        send_multiuser_token_notification(
+            user_email="refresh@test.com",
+            token="token456" + "0" * 57,
+            username="Refresh User",
+            is_new_user=False,
+        )
+
+        # Verify both received
+        welcome_email = mailhog.wait_for_email(to_email="welcome@test.com", timeout=5)
+        refresh_email = mailhog.wait_for_email(to_email="refresh@test.com", timeout=5)
+
+        assert welcome_email is not None
+        assert refresh_email is not None
+
+        # Check subject differences
+        welcome_body = mailhog.get_email_body(welcome_email)
+        refresh_body = mailhog.get_email_body(refresh_email)
+
+        assert "Welcome to the Fenrir Testing System" in welcome_body
+        assert "new authentication token has been generated" in refresh_body

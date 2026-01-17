@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from common.service_connections.db_service.database.tables.environment import (
         EnvironmentTable,
     )
-    from common.service_connections.db_service.database.tables.system_under_test_user import (
-        SystemUnderTestUserTable,
+    from common.service_connections.db_service.database.tables.environment_user import (
+        TestEnvUserAccountsTable,
     )
     from common.service_connections.db_service.database.tables.action_tables.user_interface_action.page import (
         PageTable,
@@ -73,12 +73,17 @@ class SystemUnderTestTable(Base):
     )
     owner_user_id: Mapped[str] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.id", ondelete="RESTRICT"),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="CASCADE"),
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(sql.Boolean, nullable=False, default=True)
     deactivated_at: Mapped[Optional[datetime]] = mapped_column(
         sql.DateTime, nullable=True
+    )
+    deactivated_by_user_id: Mapped[Optional[str]] = mapped_column(
+        sql.String(36),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         sql.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
@@ -95,8 +100,8 @@ class SystemUnderTestTable(Base):
         secondary="system_environment_association",
         back_populates="systems",
     )
-    users: Mapped[List["SystemUnderTestUserTable"]] = relationship(
-        "SystemUnderTestUserTable",
+    users: Mapped[List["TestEnvUserAccountsTable"]] = relationship(
+        "TestEnvUserAccountsTable",
         back_populates="system",
         cascade="all, delete-orphan",
     )

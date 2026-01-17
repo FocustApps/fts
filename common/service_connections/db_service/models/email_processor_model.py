@@ -6,18 +6,40 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 # Import centralized database components
-from common.service_connections.db_service.database import EmailProcessorTable, SystemEnum
+from common.service_connections.db_service.database import EmailProcessorTable
+from common.service_connections.db_service.database.enums import SystemEnum
+
+# Re-export SystemEnum for backward compatibility
+__all__ = ["EmailProcessorModel", "SystemEnum"]
 
 
 class EmailProcessorModel(BaseModel):
-    id: int | None = None
+    """
+    Schema for email processor records.
+    Fields match EmailProcessorTable database schema.
+
+    Fields:
+    - email_processor_id: int | None - Primary key
+    - email_item_id: int - Unique email item identifier
+    - multi_item_email_ids: List | None - JSONB list of multiple email IDs
+    - multi_email_flag: bool - Flag for multiple emails
+    - multi_attachment_flag: bool - Flag for multiple attachments
+    - system: str | None - System name
+    - test_name: str | None - Test case name
+    - requires_processing: bool - Processing flag
+    - created_at: datetime | None - Creation timestamp
+    - updated_at: datetime | None - Update timestamp
+    - last_processed_at: datetime | None - Last processing timestamp
+    """
+
+    email_processor_id: int | None = None
     email_item_id: int
     multi_item_email_ids: List | None = None
     multi_email_flag: bool = False
     multi_attachment_flag: bool = False
+    system: str | None = None
     test_name: str | None = None
     requires_processing: bool = False
-    system: SystemEnum | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     last_processed_at: datetime | None = None
@@ -35,7 +57,7 @@ def insert_email_item(
     if email_item_id.id:
         email_item_id.id = None
         logging.warning("Environment ID will only be set by the system")
-    with session() as session:
+    with session(engine) as session:
         email_item_id.created_at = datetime.now()
         db_work_item = EmailProcessorTable(**email_item_id.model_dump())
         session.add(db_work_item)
@@ -50,7 +72,7 @@ def query_email_item_by_id(
     """
     Retrieves a email_item from the database by id
     """
-    with session() as session:
+    with session(engine) as session:
         email_item = (
             session.query(EmailProcessorTable)
             .filter(EmailProcessorTable.email_processor_id == email_item_id)
@@ -66,7 +88,7 @@ def query_all_email_items(session: Session, engine) -> List[EmailProcessorModel]
     """
     Retrieves all email_items from the database
     """
-    with session() as session:
+    with session(engine) as session:
         email_items = session.query(EmailProcessorTable).all()
     return [EmailProcessorModel(**email_item.__dict__) for email_item in email_items]
 
@@ -77,7 +99,7 @@ def update_email_item_by_id(
     """
     Updates a work_item in the database
     """
-    with session() as session:
+    with session(engine) as session:
         work_item.updated_at = datetime.now()
         work_item_data = work_item.model_dump(exclude_unset=True)
 
@@ -98,7 +120,7 @@ def drop_email_item_by_id(email_item_id: int, session: Session, engine) -> int:
     Deletes a work_item in the database
     """
     # TODO: Implement a cascade deletion for the work_item field in the environment table.
-    with session() as session:
+    with session(engine) as session:
         work_item = session.get(EmailProcessorTable, email_item_id)
         session.delete(work_item)
         session.commit()
@@ -112,7 +134,7 @@ def query_email_item_by_email_item_id(
     """
     Retrieves a work_item from the database by work_item_id
     """
-    with session() as session:
+    with session(engine) as session:
         email_item = (
             session.query(EmailProcessorTable)
             .filter(EmailProcessorTable.email_item_id == email_item)
@@ -132,7 +154,7 @@ def retrieve_unprocessed_email_items(
     """
     Retrieves all email_items that require processing from the database
     """
-    with session() as session:
+    with session(engine) as session:
         email_items = (
             session.query(EmailProcessorTable)
             .filter(EmailProcessorTable.requires_processing == True)

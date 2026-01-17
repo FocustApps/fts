@@ -62,7 +62,11 @@ class PlanTable(Base):
         nullable=False,
         default="active",
     )
-    owner_user_id: Mapped[Optional[str]] = mapped_column(sql.Integer, nullable=True)
+    owner_user_id: Mapped[Optional[str]] = mapped_column(
+        sql.String(36),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     account_id: Mapped[Optional[str]] = mapped_column(sql.String(36), nullable=True)
     is_active: Mapped[bool] = mapped_column(sql.Boolean, nullable=False, default=True)
     deactivated_at: Mapped[Optional[datetime]] = mapped_column(
@@ -70,7 +74,7 @@ class PlanTable(Base):
     )
     deactivated_by_user_id: Mapped[Optional[str]] = mapped_column(
         sql.String(36),
-        sql.ForeignKey("auth_users.id", ondelete="SET NULL"),
+        sql.ForeignKey("auth_users.auth_user_id", ondelete="SET NULL"),
         nullable=True,
     )
 

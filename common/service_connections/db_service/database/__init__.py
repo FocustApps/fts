@@ -19,7 +19,7 @@ from common.service_connections.db_service.database.tables import (
     # Existing tables
     PageTable,
     EnvironmentTable,
-    SystemUnderTestUserTable,
+    TestEnvUserAccountsTable,
     IdentifierTable,
     EmailProcessorTable,
     AuthUserTable,
@@ -33,12 +33,17 @@ from common.service_connections.db_service.database.tables import (
     TestCaseTable,
     ActionChainTable,
     EntityTagTable,
+    PurgeTable,
+    RevokedTokenTable,
     # Junction tables
     AuthUserAccountAssociation,
     PageFenrirActionAssociation,
     PlanSuiteAssociation,
     SuiteTestCaseAssociation,
     SystemEnvironmentAssociation,
+)
+from common.service_connections.db_service.database.tables.account_tables.revoked_token import (
+    RevokedTokenTable,
 )
 
 # Engine and session utilities
@@ -61,7 +66,7 @@ __all__ = [
     # Existing tables
     "PageTable",
     "EnvironmentTable",
-    "SystemUnderTestUserTable",
+    "TestEnvUserAccountsTable",
     "IdentifierTable",
     "EmailProcessorTable",
     "AuthUserTable",
@@ -75,6 +80,8 @@ __all__ = [
     "TestCaseTable",
     "ActionChainTable",
     "EntityTagTable",
+    "PurgeTable",
+    "RevokedTokenTable",
     # Junction tables
     "AuthUserAccountAssociation",
     "PageFenrirActionAssociation",
